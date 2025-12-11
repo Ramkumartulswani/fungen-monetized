@@ -69,11 +69,10 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Accept Android Licenses
+      - name: Accept Android SDK licenses
         run: |
-          yes | sdkmanager --licenses
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
-          yes | $ANDROID_HOME/cmdline-tools/*/bin/sdkmanager --licenses
+          yes | sdkmanager --licenses --sdk_root=$ANDROID_HOME
+
 
 
       # -------------------------------
