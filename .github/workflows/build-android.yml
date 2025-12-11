@@ -52,7 +52,7 @@ jobs:
       - name: Generate Gradle Wrapper
         working-directory: android
         run: |
-          gradle wrapper --gradle-version 8.1.1
+          ./gradlew wrapper --gradle-version 8.1.1 || true
           chmod +x gradlew
 
       # Step 7: Build Release AAB
