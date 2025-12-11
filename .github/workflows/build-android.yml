@@ -1,1 +1,69 @@
+name: Setup & Build Android App
+
+on:
+  workflow_dispatch:
+
+jobs:
+  unzip-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout repo
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Unzip the React Native project
+      - name: Unzip project
+        run: |
+          sudo apt-get install unzip
+          unzip fungen-rn73-final.zip -d extracted
+          cp -r extracted/* .
+          rm -rf extracted
+          rm fungen-rn73-final.zip
+
+      # Step 3: Setup Node
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install node modules
+        run: npm install
+
+      # Step 4: Setup Java
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      # Step 5: Install Android SDK
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install platforms & tools
+        run: |
+          sdkmanager "platform-tools" \
+                     "platforms;android-33" \
+                     "build-tools;33.0.2"
+          yes | sdkmanager --licenses
+
+      # Step 6: Generate Gradle Wrapper
+      - name: Generate Gradle Wrapper
+        working-directory: android
+        run: |
+          gradle wrapper --gradle-version 8.1.1
+          chmod +x gradlew
+
+      # Step 7: Build Release AAB
+      - name: Build Android Release AAB
+        working-directory: android
+        run: ./gradlew bundleRelease --no-daemon
+
+      # Step 8: Upload AAB as artifact
+      - name: Upload AAB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FunGen-AAB
+          path: android/app/build/outputs/bundle/release/*.aab
 
