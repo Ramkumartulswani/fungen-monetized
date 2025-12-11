@@ -1,0 +1,48 @@
+name: Android Release Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 18 (RN 0.73 requirement)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install JDK 17 (RN 0.73 requirement)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Yarn
+        run: npm install -g yarn
+
+      - name: Install Node Modules
+        run: yarn install
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Grant execute permission for Gradlew
+        run: chmod +x android/gradlew
+
+      - name: Build Android Release (AAB)
+        working-directory: android
+        run: ./gradlew bundleRelease --no-daemon --stacktrace
+
+      - name: Upload AAB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FunGen-AAB
+          path: android/app/build/outputs/bundle/release/app-release.aab
