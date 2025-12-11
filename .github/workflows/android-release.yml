@@ -3,95 +3,79 @@ name: Android Release Build
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
-    paths:
-      - 'android/**'
-      - 'src/**'
-      - 'package.json'
+    branches: [main]
 
 jobs:
   build-android:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
 
     steps:
-      # ---------------------------------------
-      # CHECKOUT
-      # ---------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ---------------------------------------
-      # NODE SETUP
-      # ---------------------------------------
       - name: Setup Node.js 18
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      # Detect package manager
-      - name: Detect Package Manager
-        id: pkg-manager
-        run: |
-          if [ -f "yarn.lock" ]; then
-            echo "manager=yarn" >> $GITHUB_OUTPUT
-          else
-            echo "manager=npm" >> $GITHUB_OUTPUT
-          fi
-
-      # Install dependencies
       - name: Install Dependencies
-        run: |
-          if [ "${{ steps.pkg-manager.outputs.manager }}" = "yarn" ]; then
-            yarn install --frozen-lockfile
-          else
-            npm ci || npm install
-          fi
+        run: npm install
 
-      # ---------------------------------------
-      # JAVA SETUP
-      # ---------------------------------------
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
-          cache: 'gradle'
+          distribution: temurin
+          java-version: 17
 
-      # ---------------------------------------
-      # ANDROID SDK SETUP
-      # ---------------------------------------
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          accept-android-sdk-licenses: false
-          cmdline-tools-version: 12266719
-
-      # Install required packages explicitly
-      - name: Install Android SDK Packages
+      ##############################################################
+      # 🔥 FIX GRADLE WRAPPER AUTOMATICALLY
+      ##############################################################
+      - name: Restore Gradle Wrapper JAR
         run: |
-          yes | sdkmanager --sdk_root=$ANDROID_HOME "platform-tools"
-          yes | sdkmanager --sdk_root=$ANDROID_HOME "build-tools;34.0.0"
-          yes | sdkmanager --sdk_root=$ANDROID_HOME "platforms;android-34"
+          echo "🛠 Removing bad wrapper jar if present"
+          rm -f android/gradle/wrapper/gradle-wrapper.jar
 
-      - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses --sdk_root=$ANDROID_HOME
+          echo "⬇ Downloading official Gradle wrapper 8.1.1"
+          curl -L https://services.gradle.org/distributions/gradle-8.1.1-bin.zip -o gradle.zip
 
-      # ---------------------------------------
+          echo "📦 Extracting required wrapper JAR"
+          unzip -j gradle.zip "gradle-8.1.1/lib/plugins/gradle-wrapper-8.1.1.jar" -d android/gradle/wrapper/
+
+          mv android/gradle/wrapper/gradle-wrapper-8.1.1.jar \
+             android/gradle/wrapper/gradle-wrapper.jar
+
+          echo "✔ Gradle wrapper updated successfully"
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      ##############################################################
+      # ANDROID SDK
+      ##############################################################
+
+      - name: Install Android SDK components
+        run: |
+          yes | sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34"
+
+      ##############################################################
       # KEYSTORE HANDLING
-      # ---------------------------------------
+      ##############################################################
+
       - name: Setup Keystore
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           mkdir -p android/app
 
           if [ -n "$KEYSTORE_B64" ]; then
-            echo "✓ Using keystore from secrets"
+            echo "Using provided keystore"
             echo "$KEYSTORE_B64" | base64 --decode > android/app/fungen-key.keystore
           else
-            echo "⚠️ No keystore secret found — generating default keystore..."
+            echo "⚠ Generating fallback keystore"
+
             keytool -genkeypair \
               -noprompt \
               -alias fungen-key-alias \
@@ -104,80 +88,23 @@ jobs:
               -keypass android \
               -dname "CN=FunGen, OU=Mobile, O=FunGen Apps, L=Mumbai, ST=Maharashtra, C=IN"
 
-            mkdir -p keystore-backup
-            cp android/app/fungen-key.keystore keystore-backup/
-
-            echo "✔ Generated default keystore (saved in artifacts)"
           fi
 
-      # ---------------------------------------
-      # FIX GRADLE WRAPPER JAR
-      # ---------------------------------------
-      - name: Ensure valid gradle-wrapper.jar
-        run: |
-          WRAPPER_JAR="android/gradle/wrapper/gradle-wrapper.jar"
+      ##############################################################
+      # BUILD
+      ##############################################################
 
-          echo "🔍 Checking gradle-wrapper.jar validity..."
-
-          if [ ! -f "$WRAPPER_JAR" ] || ! unzip -l "$WRAPPER_JAR" | grep -q "GradleWrapperMain.class"; then
-            echo "❗ Invalid or missing wrapper jar — downloading correct version (Gradle 8.1.1)..."
-
-            wget -q https://services.gradle.org/distributions/gradle-8.1.1-bin.zip -O /tmp/gradle.zip
-            unzip -q /tmp/gradle.zip -d /tmp/gradle-dist
-
-            cp /tmp/gradle-dist/gradle-8.1.1/lib/plugins/gradle-wrapper-8.1.1.jar "$WRAPPER_JAR"
-
-            echo "✔ gradle-wrapper.jar replaced with official Gradle 8.1.1"
-          else
-            echo "✔ gradle-wrapper.jar is valid"
-          fi
-
-      # ---------------------------------------
-      # GRADLE PERMISSIONS
-      # ---------------------------------------
-      - name: Make gradlew executable
-        run: chmod +x android/gradlew
-
-      # ---------------------------------------
-      # BUILD RELEASE AAB
-      # ---------------------------------------
-      - name: Build AAB
+      - name: Build Release AAB
         working-directory: android
-        run: ./gradlew bundleRelease --stacktrace --info
         env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'android' }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'fungen-key-alias' }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'android' }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: ./gradlew bundleRelease --stacktrace --info
 
-      # ---------------------------------------
-      # SHOW OUTPUTS
-      # ---------------------------------------
-      - name: List Build Outputs
-        if: always()
-        run: ls -R android/app/build/outputs || echo "❌ No outputs found"
-
-      # ---------------------------------------
-      # UPLOAD ARTIFACT
-      # ---------------------------------------
-      - name: Upload AAB Artifact
-        if: success()
+      - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
           name: FunGen-AAB
           path: android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
-
-      # Upload auto-generated keystore if needed
-      - name: Upload Generated Keystore
-        if: success() && hashFiles('keystore-backup/fungen-key.keystore') != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: FunGen-Keystore-Backup
-          path: keystore-backup/fungen-key.keystore
-
-      # ---------------------------------------
-      # CLEANUP
-      # ---------------------------------------
-      - name: Cleanup
-        if: always()
-        run: rm -f android/app/fungen-key.keystore keystore-backup/fungen-key.keystore
