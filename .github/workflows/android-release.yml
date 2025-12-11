@@ -81,17 +81,21 @@ jobs:
           if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
             echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/fungen-key.keystore
           else
-            keytool -genkeypair -v -storetype PKCS12 \
-              -keystore android/app/fungen-key.keystore \
+            echo "⚠️ No keystore provided — generating one automatically."
+            keytool -genkeypair \
               -alias fungen-key-alias \
               -keyalg RSA \
               -keysize 2048 \
               -validity 10000 \
+              -storetype PKCS12 \
+              -keystore android/app/fungen-key.keystore \
               -storepass android \
-              -keypass android
+              -keypass android \
+              -dname "CN=FunGen, OU=Dev, O=FunGen, L=Mumbai, ST=Maharashtra, C=IN"
             mkdir -p keystore-backup
             cp android/app/fungen-key.keystore keystore-backup/
           fi
+
 
       # Gradle permission
       - name: Make gradlew executable
