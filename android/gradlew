@@ -1,3 +1,23 @@
 #!/bin/sh
-echo 'Placeholder gradlew — run gradle wrapper --gradle-version 8.1.1 to generate real wrapper in CI.'
-exit 0
+##############################################################################
+##
+##  Gradle start up script for UN*X
+##
+##############################################################################
+
+# Determine the Java command to use
+if [ -n "$JAVA_HOME" ] ; then
+    if [ -x "$JAVA_HOME/bin/java" ] ; then
+        JAVACMD="$JAVA_HOME/bin/java"
+    else
+        JAVACMD="$JAVA_HOME/jre/bin/java"
+    fi
+else
+    JAVACMD="java"
+fi
+
+# Set local variables
+CLASSPATH=`dirname "$0"`/gradle/wrapper/gradle-wrapper.jar
+
+# Execute Gradle
+exec "$JAVACMD" -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
