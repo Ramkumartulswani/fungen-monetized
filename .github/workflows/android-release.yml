@@ -109,11 +109,11 @@ jobs:
           echo "🗑️ Deleting ALL existing gradle-wrapper.jar files..."
           find . -name "gradle-wrapper.jar" -delete
 
-          echo "⬇️ Downloading official Gradle 8.1.1..."
+          echo "⬇️ Downloading official Gradle 9.2.1..."
           curl -L https://services.gradle.org/distributions/gradle-9.2.1-all.zip -o gradle.zip
 
           echo "📦 Extracting wrapper jar..."
-          unzip -j gradle.zip "gradle-8.1.1/lib/plugins/gradle-9.2.1-all.zip" -d android/gradle/wrapper/
+          unzip -j gradle.zip "gradle-9.2.1-all/lib/plugins/gradle-9.2.1-all.zip" -d android/gradle/wrapper/
 
           mv android/gradle/wrapper/gradle-wrapper-main-9.2.1.jar android/gradle/wrapper/gradle-wrapper.jar
 
