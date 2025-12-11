@@ -1,0 +1,72 @@
+name: Build Android AAB
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Unzip project
+      - name: Unzip React Native project
+        run: |
+          sudo apt-get install unzip
+          unzip fungen-rn73-final.zip -d extracted
+          cp -r extracted/* .
+          rm -rf extracted
+          rm fungen-rn73-final.zip
+
+      # Node setup
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install node modules
+        run: npm install
+
+      # Setup Java 17
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      # Install Android SDK
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android Build Tools
+        run: |
+          sdkmanager "platform-tools" \
+                     "platforms;android-33" \
+                     "build-tools;33.0.2"
+          yes | sdkmanager --licenses
+
+      # 🔥 MANUALLY DOWNLOAD GRADLE 8.1.1 AND USE IT TO GENERATE WRAPPER
+      - name: Download Gradle 8.1.1
+        run: |
+          wget https://services.gradle.org/distributions/gradle-8.1.1-bin.zip
+          unzip gradle-8.1.1-bin.zip -d $HOME/gradle8
+          echo "$HOME/gradle8/gradle-8.1.1/bin" >> $GITHUB_PATH
+
+      - name: Generate Gradle Wrapper with correct version
+        working-directory: android
+        run: |
+          $HOME/gradle8/gradle-8.1.1/bin/gradle wrapper --gradle-version 8.1.1
+          chmod +x gradlew
+
+      # Build with wrapper
+      - name: Build Release AAB
+        working-directory: android
+        run: ./gradlew bundleRelease --no-daemon --warning-mode all
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: FunGen-AAB
+          path: android/app/build/outputs/bundle/release/*.aab
