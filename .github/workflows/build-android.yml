@@ -1,4 +1,4 @@
-name: Build Android AAB
+name: Unzip and Build Android
 
 on:
   workflow_dispatch:
@@ -8,60 +8,72 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # Unzip project
-      - name: Unzip React Native project
-        run: |
-          sudo apt-get install unzip
-          unzip fungen-rn73-final.zip -d extracted
-          cp -r extracted/* .
-          rm -rf extracted
-          rm fungen-rn73-final.zip
+      # DEBUG — List repo contents
+      - name: List repo contents before unzip
+        run: ls -R .
 
-      # Node setup
+      # 🔥 STEP 1 — Unzip project correctly
+      - name: Unzip RN project
+        run: |
+          sudo apt-get update && sudo apt-get install -y unzip
+          unzip -o fungen-rn73-final.zip -d .
+          ls -R .
+
+      # 🔥 STEP 2 — Move extracted folder if nested
+      - name: Fix folder structure
+        run: |
+          # If zip extracted into a subfolder, move it up
+          if [ -d "./fungen-rn73-final" ]; then
+            mv ./fungen-rn73-final/* .
+            rm -rf fungen-rn73-final
+          fi
+          ls -R .
+
+      # NODE
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      - name: Install node modules
+      - name: Install Node Modules
         run: npm install
 
-      # Setup Java 17
+      # JAVA
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
           java-version: "17"
 
-      # Install Android SDK
+      # ANDROID SDK
       - name: Install Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android Build Tools
+      - name: Install Build Tools
         run: |
           sdkmanager "platform-tools" \
                      "platforms;android-33" \
                      "build-tools;33.0.2"
           yes | sdkmanager --licenses
 
-      # 🔥 MANUALLY DOWNLOAD GRADLE 8.1.1 AND USE IT TO GENERATE WRAPPER
-      - name: Download Gradle 8.1.1
+      # GRADLE 8.1.1 BOOTSTRAP
+      - name: Download Correct Gradle
         run: |
           wget https://services.gradle.org/distributions/gradle-8.1.1-bin.zip
           unzip gradle-8.1.1-bin.zip -d $HOME/gradle8
-          echo "$HOME/gradle8/gradle-8.1.1/bin" >> $GITHUB_PATH
 
-      - name: Generate Gradle Wrapper with correct version
+      # Generate wrapper using correct Gradle
+      - name: Generate Gradle Wrapper
         working-directory: android
         run: |
           $HOME/gradle8/gradle-8.1.1/bin/gradle wrapper --gradle-version 8.1.1
           chmod +x gradlew
 
-      # Build with wrapper
-      - name: Build Release AAB
+      # Build Release AAB
+      - name: Build AAB
         working-directory: android
         run: ./gradlew bundleRelease --no-daemon --warning-mode all
 
