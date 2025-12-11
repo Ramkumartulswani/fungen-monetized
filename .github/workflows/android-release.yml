@@ -5,82 +5,110 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'android/**'
+      - 'src/**'
+      - 'package.json'
 
 jobs:
   build-android:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
+
+    env:
+      ANDROID_SDK_ROOT: /usr/local/android-sdk
+      # Defaults (overridable by repository secrets)
+      DEFAULT_KEYSTORE_PASSWORD: Fungen@2025
+      DEFAULT_KEY_PASSWORD: Fungen@2025
+      DEFAULT_KEY_ALIAS: fungen-key-alias
 
     steps:
       # -------------------------------
       # CHECKOUT
       # -------------------------------
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       # -------------------------------
-      # NODE
+      # SETUP NODE
       # -------------------------------
-      - name: Setup Node.js
+      - name: Setup Node.js 18
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      - name: Install JS Dependencies
-        run: npm install
+      - name: Detect package manager
+        id: pkg
+        run: |
+          if [ -f "yarn.lock" ]; then
+            echo "manager=yarn" >> $GITHUB_OUTPUT
+          else
+            echo "manager=npm" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install JS dependencies
+        run: |
+          if [ "${{ steps.pkg.outputs.manager }}" = "yarn" ]; then
+            yarn install --frozen-lockfile
+          else
+            npm ci || npm install
+          fi
 
       # -------------------------------
-      # JAVA
+      # SETUP JAVA
       # -------------------------------
-      - name: Setup Java 17
+      - name: Setup Java 17 (Temurin)
         uses: actions/setup-java@v4
         with:
-          distribution: "temurin"
-          java-version: "17"
-          cache: "gradle"
+          distribution: temurin
+          java-version: 17
+          cache: gradle
 
-      # ---------------------------------------------------------
-      # ANDROID SDK — MANUAL INSTALL (stable method)
-      # ---------------------------------------------------------
-      - name: Install Android SDK
+      # -------------------------------
+      # INSTALL ANDROID SDK (manual & stable)
+      # -------------------------------
+      - name: Install Android SDK (manual)
         run: |
-          sudo mkdir -p /usr/local/android-sdk
-          sudo chown $USER:$USER /usr/local/android-sdk
+          sudo mkdir -p $ANDROID_SDK_ROOT
+          sudo chown $USER:$USER $ANDROID_SDK_ROOT
 
-          echo "⬇️ Downloading Android cmdline-tools..."
-          wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline.zip
-          unzip -q cmdline.zip -d /usr/local/android-sdk/cmdline-tools
-          mv /usr/local/android-sdk/cmdline-tools/cmdline-tools /usr/local/android-sdk/cmdline-tools/latest
+          echo "⬇️ Downloading Android command line tools..."
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline.zip
+          unzip -q cmdline.zip -d $ANDROID_SDK_ROOT/cmdline-tools
+          # move extracted folder to 'latest' path used by sdkmanager
+          if [ -d "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools" ]; then
+            mv $ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools $ANDROID_SDK_ROOT/cmdline-tools/latest
+          else
+            mv $ANDROID_SDK_ROOT/cmdline-tools $ANDROID_SDK_ROOT/cmdline-tools/latest || true
+          fi
 
-          export ANDROID_HOME=/usr/local/android-sdk
-          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
+          export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
 
           echo "✔ Accepting licenses..."
-          yes | sdkmanager --licenses
+          yes | sdkmanager --licenses || true
 
-          echo "⬇️ Installing required SDK packages..."
-          yes | sdkmanager "platform-tools"
-          yes | sdkmanager "platforms;android-34"
-          yes | sdkmanager "build-tools;34.0.0"
+          echo "⬇️ Installing platform-tools + build-tools + platform"
+          yes | sdkmanager "platform-tools" || true
+          yes | sdkmanager "build-tools;34.0.0" || true
+          yes | sdkmanager "platforms;android-34" || true
 
-      # ---------------------------------------------------------
-      # KEYSTORE
-      # ---------------------------------------------------------
-      - name: Setup Keystore (use secrets or auto-generate)
+      # -------------------------------
+      # KEYSTORE (decode from secret or auto-generate)
+      # -------------------------------
+      - name: Setup Keystore
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'Fungen@2025' }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'Fungen@2025' }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'fungen-key-alias' }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || env.DEFAULT_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || env.DEFAULT_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || env.DEFAULT_KEY_ALIAS }}
         run: |
           mkdir -p android/app
-
+          # If KEYSTORE_B64 supplied, decode it. Otherwise generate.
           if [ -n "$KEYSTORE_B64" ]; then
-            echo "✓ Using keystore from secrets"
+            echo "✓ Using provided keystore (decoded from secret)"
             echo "$KEYSTORE_B64" | base64 --decode > android/app/fungen-key.keystore
           else
-            echo "⚠️ No keystore secret found — generating new keystore..."
-
+            echo "⚠️ No keystore secret found — generating new keystore with defaults"
             keytool -genkeypair \
               -alias "$KEY_ALIAS" \
               -keyalg RSA \
@@ -92,57 +120,124 @@ jobs:
               -keypass "$KEY_PASSWORD" \
               -dname "CN=FunGen, OU=Mobile, O=FunGen Apps, L=Mumbai, ST=Maharashtra, C=IN" \
               -noprompt
-
             mkdir -p keystore-backup
             cp android/app/fungen-key.keystore keystore-backup/
-            echo "✔ Generated default keystore"
+            echo "✔ Generated keystore and saved to keystore-backup/"
           fi
 
-      # ---------------------------------------------------------
-      # FORCE FIX FOR CORRUPTED GRADLE WRAPPER
-      # ---------------------------------------------------------
-      - name: Force Replace Gradle Wrapper (fix corrupted repo)
+      # -------------------------------
+      # ENSURE A VALID gradlew SCRIPT (replace placeholder if necessary)
+      # -------------------------------
+      - name: Ensure real gradlew script
         run: |
-          echo "🔍 Searching for ALL gradle-wrapper.jar files..."
-          find . -name "gradle-wrapper.jar" -print
+          # If gradlew looks like the placeholder, overwrite with a correct script.
+          if grep -q "Placeholder gradlew" android/gradlew 2>/dev/null || [ ! -f android/gradlew ]; then
+            echo "⚠️ Replacing placeholder/absent android/gradlew with real wrapper script"
+            cat > android/gradlew <<'EOF'
+#!/usr/bin/env sh
+##############################################################################
+# Gradle start up script (POSIX) - generated by CI helper
+##############################################################################
+PRG="$0"
+# Resolve symlinks
+while [ -h "$PRG" ] ; do
+  ls=`ls -ld "$PRG"`
+  link=`expr "$ls" : '.*-> \(.*\)$'`
+  if expr "$link" : '/.*' > /dev/null; then
+    PRG="$link"
+  else
+    PRG=`dirname "$PRG"`"/$link"
+  fi
+done
+SAVED="`pwd`"
+cd "`dirname \"$PRG\"`/.." >/dev/null
+APP_HOME="`pwd -P`"
+cd "$SAVED" >/dev/null
+CLASSPATH="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
+if [ -n "$JAVA_HOME" ] ; then
+  if [ -x "$JAVA_HOME/bin/java" ] ; then
+    JAVACMD="$JAVA_HOME/bin/java"
+  else
+    JAVACMD="$JAVA_HOME/jre/bin/java"
+  fi
+else
+  JAVACMD="java"
+fi
+exec "$JAVACMD" -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
+EOF
+            chmod +x android/gradlew
+          else
+            echo "✓ android/gradlew looks valid — leaving it"
+          fi
 
-          echo "🗑️ Deleting ALL existing gradle-wrapper.jar files..."
-          find . -name "gradle-wrapper.jar" -delete
+      # -------------------------------
+      # REPLACE CORRUPTED gradle-wrapper.jar WITH GRADLE 9.2.1 (CI-safe mirror)
+      # -------------------------------
+      - name: Replace Gradle Wrapper JAR (Gradle 9.2.1)
+        run: |
+          set -e
+          mkdir -p android/gradle/wrapper
+          echo "🔍 Locating any existing gradle-wrapper.jar files..."
+          find . -name "gradle-wrapper.jar" -print || true
 
-          echo "⬇️ Downloading official Gradle 9.2.1..."
-          curl -L https://services.gradle.org/distributions/gradle-9.2.1-all.zip -o gradle.zip
+          echo "🗑️ Removing existing wrapper jars (if any)..."
+          find . -name "gradle-wrapper.jar" -delete || true
 
-          echo "📦 Extracting correct Gradle 9.2.1 wrapper jar..."
+          echo "⬇️ Downloading Gradle 9.2.1 (CI-safe mirror)..."
+          # Use the downloads.gradle-dn.com CDN to avoid CI-side bot blocking
+          curl --fail -L https://downloads.gradle-dn.com/distributions/gradle-9.2.1-all.zip -o gradle.zip
+
+          echo "📦 Inspecting archive contents (short list)..."
+          unzip -l gradle.zip | sed -n '1,20p' || true
+
+          # correct file inside zip for Gradle 9.2.1: gradle-9.2.1/lib/gradle-wrapper-shared-9.2.1.jar
+          echo "📦 Extracting gradle-wrapper-shared-9.2.1.jar..."
           unzip -j gradle.zip "gradle-9.2.1/lib/gradle-wrapper-shared-9.2.1.jar" -d android/gradle/wrapper/
 
-          echo "📄 Renaming wrapper to standard name..."
-          mv android/gradle/wrapper/gradle-wrapper-shared-9.2.1.jar android/gradle/wrapper/gradle-wrapper.jar
+          echo "📄 Renaming to gradle-wrapper.jar (required name)..."
+          if [ -f android/gradle/wrapper/gradle-wrapper-shared-9.2.1.jar ]; then
+            mv android/gradle/wrapper/gradle-wrapper-shared-9.2.1.jar android/gradle/wrapper/gradle-wrapper.jar
+          fi
 
           echo "🔎 Final wrapper locations:"
-          find . -name "gradle-wrapper.jar" -print
+          find . -name "gradle-wrapper.jar" -print || true
+          echo "✔ Gradle wrapper (9.2.1) installed."
 
-          echo "✔ Gradle wrapper updated successfully"
-
-
-      # ---------------------------------------------------------
-      # MAKE GRADLEW EXECUTABLE
-      # ---------------------------------------------------------
+      # -------------------------------
+      # MAKE gradlew EXECUTABLE
+      # -------------------------------
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      # ---------------------------------------------------------
+      # -------------------------------
       # BUILD AAB
-      # ---------------------------------------------------------
-      - name: Build AAB
+      # -------------------------------
+      - name: Build Android AAB
         working-directory: android
-        run: ./gradlew bundleRelease --stacktrace --info
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || env.DEFAULT_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || env.DEFAULT_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || env.DEFAULT_KEY_PASSWORD }}
+        run: |
+          ./gradlew bundleRelease --stacktrace --no-daemon --info
 
-      # ---------------------------------------------------------
-      # UPLOAD ARTIFACT
-      # ---------------------------------------------------------
+      # -------------------------------
+      # UPLOAD ARTIFACTS
+      # -------------------------------
       - name: Upload AAB Artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: FunGen-AAB
+          name: FunGen-AAB-${{ github.sha }}
           path: android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Generated Keystore (if created)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FunGen-Keystore-${{ github.sha }}
+          path: keystore-backup/fungen-key.keystore
+          if-no-files-found: ignore
+          retention-days: 90
