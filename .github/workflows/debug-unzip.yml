@@ -1,4 +1,4 @@
-name: Debug Unzip
+name: Unzip and Prepare RN Project
 
 on:
   workflow_dispatch:
@@ -14,35 +14,21 @@ jobs:
       - name: Install unzip
         run: sudo apt-get install -y unzip
 
-      # 1️⃣ Show files
-      - name: SHOW FILES BEFORE UNZIP
-        run: |
-          echo "==== ROOT FILES ===="
-          ls -lah .
-          echo "===================="
+      - name: Show files before unzip
+        run: ls -lah .
 
-      # 2️⃣ Show ZIP details
-      - name: SHOW ZIP DETAILS
+      - name: Unzip project
         run: |
-          echo "ZIP FILE INFO:"
-          ls -lah fungen-rn73-final.zip
-          echo "UNZIP TEST:"
-          unzip -l fungen-rn73-final.zip || true
-
-      # 3️⃣ Try unzipping normally
-      - name: ATTEMPT UNZIP
-        run: |
-          mkdir extracted
-          unzip -o fungen-rn73-final.zip -d extracted || true
+          unzip -o fungen-rn73-final.zip -d extracted
           echo "==== AFTER UNZIP ===="
-          ls -R extracted || true
+          ls -R extracted
 
-      # 4️⃣ Try extracting nested folder
-      - name: MOVE CONTENTS IF NESTED
+      # ✔ FIXED: Copy entire project root
+      - name: Copy full project to root
         run: |
-          NESTED=$(find extracted -maxdepth 2 -mindepth 1 -type d | head -n 1)
-          echo "Detected nested folder: $NESTED"
-          cp -R $NESTED/* . 2>/dev/null || true
+          cp -R extracted/* .
+          rm -rf extracted
+          rm fungen-rn73-final.zip
           echo "==== ROOT AFTER COPY ===="
           ls -lah .
 
