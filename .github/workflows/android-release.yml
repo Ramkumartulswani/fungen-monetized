@@ -16,14 +16,17 @@ jobs:
     timeout-minutes: 60
 
     steps:
+      # Checkout source code
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Node setup
       - name: Setup Node.js 18
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
+      # Detect package manager
       - name: Detect Package Manager
         id: pkg-manager
         run: |
@@ -33,6 +36,7 @@ jobs:
             echo "manager=npm" >> $GITHUB_OUTPUT
           fi
 
+      # Install JS dependencies
       - name: Install Dependencies
         run: |
           if [ "${{ steps.pkg-manager.outputs.manager }}" = "yarn" ]; then
@@ -41,6 +45,7 @@ jobs:
             npm ci || npm install
           fi
 
+      # Setup JDK
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
@@ -49,7 +54,7 @@ jobs:
           cache: 'gradle'
 
       # -------------------------------
-      # FIXED ANDROID SDK BLOCK
+      # ✅ FIXED ANDROID SDK BLOCK
       # -------------------------------
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -61,13 +66,11 @@ jobs:
             build-tools;34.0.0
             platforms;android-34
 
-      
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses --sdk_root=$ANDROID_HOME
 
-
       # -------------------------------
-      # KEYSTORE
+      # Keystore setup
       # -------------------------------
       - name: Setup Keystore
         run: |
@@ -86,13 +89,18 @@ jobs:
             cp android/app/fungen-key.keystore keystore-backup/
           fi
 
+      # Gradle permission
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
+      # Verify gradle setup
       - name: Verify Gradle Setup
         working-directory: android
         run: ./gradlew --version
 
+      # -------------------------------
+      # BUILD AAB
+      # -------------------------------
       - name: Build AAB
         working-directory: android
         run: ./gradlew bundleRelease --stacktrace --info
@@ -101,12 +109,14 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'fungen-key-alias' }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'android' }}
 
+      # Debug output
       - name: List Build Outputs
         if: always()
         run: |
           echo "=== Checking build outputs ==="
           ls -R android/app/build/outputs || echo "❌ No outputs found"
 
+      # Upload AAB artifact
       - name: Upload AAB Artifact
         if: success()
         uses: actions/upload-artifact@v4
@@ -116,6 +126,7 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
+      # Upload keystore if generated
       - name: Upload Generated Keystore
         if: success() && hashFiles('keystore-backup/fungen-key.keystore') != ''
         uses: actions/upload-artifact@v4
@@ -124,6 +135,7 @@ jobs:
           path: keystore-backup/fungen-key.keystore
           retention-days: 90
 
+      # Cleanup
       - name: Cleanup Keystore
         if: always()
         run: rm -f android/app/fungen-key.keystore keystore-backup/fungen-key.keystore
