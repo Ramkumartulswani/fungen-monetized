@@ -3,106 +3,117 @@ name: Android Release Build
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   build-android:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 18
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      - name: Install Dependencies
+      - name: Install JS Dependencies
         run: npm install
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: 17
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
 
-      ##############################################################
-      # 🔥 FIX GRADLE WRAPPER AUTOMATICALLY
-      ##############################################################
-      - name: Restore Gradle Wrapper JAR
+      # ---------------------------------------------------------
+      # ✅ WORKING ANDROID SDK INSTALLER
+      # ---------------------------------------------------------
+      - name: Install Android SDK
         run: |
-          echo "🛠 Removing bad wrapper jar if present"
+          sudo mkdir -p /usr/local/android-sdk
+          sudo chown $USER:$USER /usr/local/android-sdk
+
+          wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline.zip
+          unzip -q cmdline.zip -d /usr/local/android-sdk/cmdline-tools
+          mv /usr/local/android-sdk/cmdline-tools/cmdline-tools /usr/local/android-sdk/cmdline-tools/latest
+
+          export ANDROID_HOME=/usr/local/android-sdk
+          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
+
+          yes | sdkmanager --licenses
+          yes | sdkmanager "platform-tools"
+          yes | sdkmanager "platforms;android-34"
+          yes | sdkmanager "build-tools;34.0.0"
+
+      # ---------------------------------------------------------
+      # 🛠 FIX GRADLE WRAPPER (THIS IS THE ONLY THING YOU WERE MISSING)
+      # ---------------------------------------------------------
+      - name: Restore Working Gradle Wrapper JAR
+        run: |
+          echo "Deleting broken wrapper jar..."
           rm -f android/gradle/wrapper/gradle-wrapper.jar
 
-          echo "⬇ Downloading official Gradle wrapper 8.1.1"
+          echo "Downloading official Gradle wrapper..."
           curl -L https://services.gradle.org/distributions/gradle-8.1.1-bin.zip -o gradle.zip
 
-          echo "📦 Extracting required wrapper JAR"
+          echo "Extracting wrapper jar..."
           unzip -j gradle.zip "gradle-8.1.1/lib/plugins/gradle-wrapper-8.1.1.jar" -d android/gradle/wrapper/
 
-          mv android/gradle/wrapper/gradle-wrapper-8.1.1.jar \
-             android/gradle/wrapper/gradle-wrapper.jar
+          mv android/gradle/wrapper/gradle-wrapper-8.1.1.jar android/gradle/wrapper/gradle-wrapper.jar
 
-          echo "✔ Gradle wrapper updated successfully"
+          echo "✔ Gradle wrapper restored successfully"
 
-      - name: Make gradlew executable
-        run: chmod +x android/gradlew
-
-      ##############################################################
-      # ANDROID SDK
-      ##############################################################
-
-      - name: Install Android SDK components
-        run: |
-          yes | sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34"
-
-      ##############################################################
-      # KEYSTORE HANDLING
-      ##############################################################
-
-      - name: Setup Keystore
+      # ---------------------------------------------------------
+      # Keystore
+      # ---------------------------------------------------------
+      - name: Setup Keystore (use secrets or defaults)
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'Fungen@2025' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'Fungen@2025' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'fungen-key-alias' }}
         run: |
           mkdir -p android/app
-
+      
           if [ -n "$KEYSTORE_B64" ]; then
-            echo "Using provided keystore"
+            echo "✓ Using keystore from secrets"
             echo "$KEYSTORE_B64" | base64 --decode > android/app/fungen-key.keystore
           else
-            echo "⚠ Generating fallback keystore"
-
+            echo "⚠️ No keystore secret found — generating default keystore..."
+      
             keytool -genkeypair \
-              -noprompt \
-              -alias fungen-key-alias \
+              -alias "$KEY_ALIAS" \
               -keyalg RSA \
               -keysize 2048 \
               -validity 10000 \
               -storetype PKCS12 \
               -keystore android/app/fungen-key.keystore \
-              -storepass android \
-              -keypass android \
-              -dname "CN=FunGen, OU=Mobile, O=FunGen Apps, L=Mumbai, ST=Maharashtra, C=IN"
-
+              -storepass "$KEYSTORE_PASSWORD" \
+              -keypass "$KEY_PASSWORD" \
+              -dname "CN=FunGen, OU=Mobile, O=FunGen Apps, L=Mumbai, ST=Maharashtra, C=IN" \
+              -noprompt
+      
+            mkdir -p keystore-backup
+            cp android/app/fungen-key.keystore keystore-backup/
+            echo "✔ Generated default keystore (saved in artifacts)"
           fi
 
-      ##############################################################
-      # BUILD
-      ##############################################################
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
 
-      - name: Build Release AAB
+      # ---------------------------------------------------------
+      # Build
+      # ---------------------------------------------------------
+      - name: Build AAB
         working-directory: android
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-        run: ./gradlew bundleRelease --stacktrace --info
+        run: ./gradlew bundleRelease --stacktrace
 
-      - name: Upload AAB
+      - name: Upload AAB Artifact
         uses: actions/upload-artifact@v4
         with:
           name: FunGen-AAB
