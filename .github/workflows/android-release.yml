@@ -18,12 +18,13 @@ jobs:
     env:
       ANDROID_HOME: /usr/local/android-sdk
       ANDROID_SDK_ROOT: /usr/local/android-sdk
+      # Defaults (override with repo secrets if you want)
       DEFAULT_KEYSTORE_PASSWORD: Fungen@2025
       DEFAULT_KEY_PASSWORD: Fungen@2025
       DEFAULT_KEY_ALIAS: fungen-key-alias
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Node.js 18
@@ -32,7 +33,7 @@ jobs:
           node-version: 18
 
       - name: Detect package manager
-        id: pkg
+        id: pkg-manager
         run: |
           if [ -f "yarn.lock" ]; then
             echo "manager=yarn" >> $GITHUB_OUTPUT
@@ -42,7 +43,7 @@ jobs:
 
       - name: Install JS dependencies
         run: |
-          if [ "${{ steps.pkg.outputs.manager }}" = "yarn" ]; then
+          if [ "${{ steps.pkg-manager.outputs.manager }}" = "yarn" ]; then
             yarn install --frozen-lockfile
           else
             npm ci || npm install
@@ -55,7 +56,7 @@ jobs:
           java-version: 17
           cache: gradle
 
-      - name: Install Android SDK (manual, persistent)
+      - name: Install Android SDK (manual)
         run: |
           sudo mkdir -p $ANDROID_HOME
           sudo chown $USER:$USER $ANDROID_HOME
@@ -63,7 +64,6 @@ jobs:
           echo "⬇️ Downloading Android command line tools..."
           wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline.zip
           unzip -q cmdline.zip -d $ANDROID_HOME/cmdline-tools
-          # ensure path is in expected layout
           if [ -d "$ANDROID_HOME/cmdline-tools/cmdline-tools" ]; then
             mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
           else
@@ -71,7 +71,6 @@ jobs:
             mv $ANDROID_HOME/cmdline-tools/* $ANDROID_HOME/cmdline-tools/latest || true
           fi
 
-          # ensure sdkmanager on PATH for this run
           export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
 
           echo "✔ Accepting licenses..."
@@ -90,6 +89,7 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS || env.DEFAULT_KEY_ALIAS }}
         run: |
           mkdir -p android/app
+
           if [ -n "$KEYSTORE_B64" ]; then
             echo "✓ Using provided keystore (decoded)"
             echo "$KEYSTORE_B64" | base64 --decode > android/app/fungen-key.keystore
@@ -108,13 +108,13 @@ jobs:
               -noprompt
             mkdir -p keystore-backup
             cp android/app/fungen-key.keystore keystore-backup/
-            echo "✔ Generated keystore and saved to keystore-backup/"
+            echo "✔ Generated keystore and copied to keystore-backup/"
           fi
 
       - name: Ensure real gradlew script (replace placeholder if found)
         run: |
           if [ ! -f android/gradlew ] || grep -q "Placeholder gradlew" android/gradlew 2>/dev/null; then
-            echo "⚠️ Creating correct android/gradlew (replaces placeholder/absent file)"
+            echo "⚠️ Creating/Replacing android/gradlew with a proper wrapper script"
             cat > android/gradlew <<'EOF'
 #!/usr/bin/env sh
 PRG="$0"
@@ -145,10 +145,10 @@ exec "$JAVACMD" -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@
 EOF
             chmod +x android/gradlew
           else
-            echo "✓ android/gradlew looks valid"
+            echo "✓ android/gradlew appears valid"
           fi
 
-      - name: Replace Gradle wrapper JAR with 9.2.1 (robust download + validate)
+      - name: Replace Gradle wrapper JAR (Gradle 9.2.1, CI-safe)
         run: |
           set -euo pipefail
           mkdir -p android/gradle/wrapper
@@ -159,26 +159,24 @@ EOF
           find . -name "gradle-wrapper.jar" -delete || true
 
           echo "⬇️ Downloading Gradle 9.2.1 (CI-safe CDN) with retries..."
-          # downloads.gradle-dn.com is CI safe. fall back to services.gradle.org if needed
           URL="https://downloads.gradle-dn.com/distributions/gradle-9.2.1-all.zip"
           curl --retry 5 --retry-delay 5 --location --fail "$URL" -o gradle.zip
 
           echo "📦 Checking downloaded file size (bytes):"
           stat -c%s gradle.zip || true
 
-          # quick sanity: if file is tiny (<1MB) print head to show error HTML
           SIZE=$(stat -c%s gradle.zip || echo 0)
           if [ "$SIZE" -lt 1048576 ]; then
-            echo "⚠️ gradle.zip looks unexpectedly small ($SIZE bytes) — printing first 200 bytes for debug"
+            echo "⚠️ gradle.zip looks small ($SIZE bytes) — printing first 200 bytes for debug"
             head -c 200 gradle.zip | sed 's/<[^>]*>//g' || true
             exit 20
           fi
 
-          echo "📦 Extracting wrapper jar (actual path for 9.2.1)..."
+          echo "📦 Extracting gradle-wrapper-shared-9.2.1.jar (correct path for 9.2.1)"
           unzip -j gradle.zip "gradle-9.2.1/lib/gradle-wrapper-shared-9.2.1.jar" -d android/gradle/wrapper/
 
           if [ ! -f android/gradle/wrapper/gradle-wrapper-shared-9.2.1.jar ]; then
-            echo "❌ Expected jar not found in the ZIP — listing archive contents for debugging:"
+            echo "❌ Expected jar not found — listing archive contents:"
             unzip -l gradle.zip | sed -n '1,200p' || true
             exit 21
           fi
@@ -190,7 +188,7 @@ EOF
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      - name: Verify Gradle and Project (quick)
+      - name: Verify Gradle (quick)
         working-directory: android
         run: |
           ./gradlew --version || true
@@ -214,7 +212,7 @@ EOF
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload Generated Keystore (if any)
+      - name: Upload Generated Keystore (if created)
         if: always()
         uses: actions/upload-artifact@v4
         with:
