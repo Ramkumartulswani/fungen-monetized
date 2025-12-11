@@ -59,24 +59,26 @@ jobs:
       - name: Fix Gradle Wrapper
         run: |
           echo "=== Using Gradle 9.2.1 ==="
-          GRADLE_VERSION="9.2.1"
           
           echo "=== Removing corrupt wrapper JAR ==="
           rm -f android/gradle/wrapper/gradle-wrapper.jar
           
-          echo "=== Downloading Gradle 9.2.1 wrapper JAR from Maven ==="
-          mkdir -p android/gradle/wrapper
+          echo "=== Downloading Gradle 9.2.1 distribution ==="
+          curl -L "https://services.gradle.org/distributions/gradle-9.2.1-bin.zip" -o gradle-temp.zip
+          
+          echo "=== Listing contents to find wrapper JAR ==="
+          unzip -l gradle-temp.zip | grep -i wrapper || true
+          
+          echo "=== Extracting wrapper JAR ==="
+          unzip -j gradle-temp.zip "gradle-9.2.1/lib/gradle-wrapper-*.jar" -d android/gradle/wrapper/ || {
+            echo "Trying alternative path..."
+            unzip -j gradle-temp.zip "*/lib/plugins/gradle-wrapper-*.jar" -d android/gradle/wrapper/
+          }
+          
           cd android/gradle/wrapper
           
-          curl -f -L "https://repo1.maven.org/maven2/org/gradle/gradle-wrapper/9.2.1/gradle-wrapper-9.2.1.jar" -o gradle-wrapper.jar || {
-            echo "Maven failed, trying direct distribution download..."
-            cd ../../..
-            curl -L "https://services.gradle.org/distributions/gradle-9.2.1-bin.zip" -o gradle-temp.zip
-            unzip -q gradle-temp.zip "gradle-9.2.1/lib/gradle-wrapper-9.2.1.jar"
-            cp gradle-9.2.1/lib/gradle-wrapper-9.2.1.jar android/gradle/wrapper/gradle-wrapper.jar
-            rm -rf gradle-9.2.1 gradle-temp.zip
-            cd android/gradle/wrapper
-          }
+          echo "=== Renaming wrapper JAR ==="
+          mv gradle-wrapper-*.jar gradle-wrapper.jar 2>/dev/null || echo "Already named correctly"
           
           echo "=== Verifying wrapper JAR ==="
           ls -lh gradle-wrapper.jar
@@ -92,6 +94,9 @@ jobs:
           
           echo "✓ gradle-wrapper.properties configured"
           cat gradle-wrapper.properties
+          
+          cd ../../..
+          rm -f gradle-temp.zip
       
       - name: Verify Gradle
         working-directory: android
