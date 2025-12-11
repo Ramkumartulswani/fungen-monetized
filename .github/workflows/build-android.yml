@@ -1,84 +1,40 @@
-name: Unzip and Build Android
+name: Unzip and Prepare RN Project
 
 on:
   workflow_dispatch:
 
 jobs:
-  build:
+  unzip:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # DEBUG — List repo contents
-      - name: List repo contents before unzip
+      - name: Show files BEFORE unzip
         run: ls -R .
 
-      # 🔥 STEP 1 — Unzip project correctly
-      - name: Unzip RN project
+      - name: Install unzip
+        run: sudo apt-get install -y unzip
+
+      - name: Extract ZIP
         run: |
-          sudo apt-get update && sudo apt-get install -y unzip
-          unzip -o fungen-rn73-final.zip -d .
-          ls -R .
+          unzip -o fungen-rn73-final.zip -d extracted
+          echo "---- AFTER EXTRACT ----"
+          ls -R extracted
 
-      # 🔥 STEP 2 — Move extracted folder if nested
-      - name: Fix folder structure
+      - name: Move project files to root (auto-detect root folder)
         run: |
-          # If zip extracted into a subfolder, move it up
-          if [ -d "./fungen-rn73-final" ]; then
-            mv ./fungen-rn73-final/* .
-            rm -rf fungen-rn73-final
-          fi
-          ls -R .
+          # Detect nested folder inside ZIP
+          ROOT_DIR=$(find extracted -maxdepth 2 -mindepth 1 -type d | head -n 1)
+          echo "Detected project folder: $ROOT_DIR"
 
-      # NODE
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
+          # Move all extracted files to repo root
+          cp -R $ROOT_DIR/* .
 
-      - name: Install Node Modules
-        run: npm install
+          # Cleanup
+          rm -rf extracted
+          rm fungen-rn73-final.zip
 
-      # JAVA
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: "temurin"
-          java-version: "17"
-
-      # ANDROID SDK
-      - name: Install Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Build Tools
-        run: |
-          sdkmanager "platform-tools" \
-                     "platforms;android-33" \
-                     "build-tools;33.0.2"
-          yes | sdkmanager --licenses
-
-      # GRADLE 8.1.1 BOOTSTRAP
-      - name: Download Correct Gradle
-        run: |
-          wget https://services.gradle.org/distributions/gradle-8.1.1-bin.zip
-          unzip gradle-8.1.1-bin.zip -d $HOME/gradle8
-
-      # Generate wrapper using correct Gradle
-      - name: Generate Gradle Wrapper
-        working-directory: android
-        run: |
-          $HOME/gradle8/gradle-8.1.1/bin/gradle wrapper --gradle-version 8.1.1
-          chmod +x gradlew
-
-      # Build Release AAB
-      - name: Build AAB
-        working-directory: android
-        run: ./gradlew bundleRelease --no-daemon --warning-mode all
-
-      - name: Upload AAB
-        uses: actions/upload-artifact@v4
-        with:
-          name: FunGen-AAB
-          path: android/app/build/outputs/bundle/release/*.aab
+      - name: Show files AFTER unzip
+        run: ls -R .
