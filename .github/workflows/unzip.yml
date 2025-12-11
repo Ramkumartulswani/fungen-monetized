@@ -17,14 +17,16 @@ jobs:
       - name: Show files before unzip
         run: ls -lah .
 
-      - name: Extract ZIP (copy entire project)
+      # 🔥 Extract ZIP
+      - name: Unzip project
         run: |
           rm -rf extracted
           unzip -o fungen-rn73-final.zip -d extracted
-          echo "==== CONTENTS OF extracted/ ===="
-          ls -R extracted
+          echo "==== After unzip ===="
+          ls -lah extracted
 
-      - name: Copy full project to root
+      # 🔥 COPY EVERYTHING FROM extracted/ (NO DETECTION!!)
+      - name: Move project to root
         run: |
           cp -R extracted/* .
           rm -rf extracted
