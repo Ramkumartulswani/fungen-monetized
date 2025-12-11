@@ -110,12 +110,12 @@ jobs:
           find . -name "gradle-wrapper.jar" -delete
 
           echo "⬇️ Downloading official Gradle 8.1.1..."
-          curl -L https://services.gradle.org/distributions/gradle-8.1.1-bin.zip -o gradle.zip
+          curl -L https://services.gradle.org/distributions/gradle-9.2.1-all.zip -o gradle.zip
 
           echo "📦 Extracting wrapper jar..."
-          unzip -j gradle.zip "gradle-8.1.1/lib/plugins/gradle-wrapper-8.1.1.jar" -d android/gradle/wrapper/
+          unzip -j gradle.zip "gradle-8.1.1/lib/plugins/gradle-9.2.1-all.zip" -d android/gradle/wrapper/
 
-          mv android/gradle/wrapper/gradle-wrapper-8.1.1.jar android/gradle/wrapper/gradle-wrapper.jar
+          mv android/gradle/wrapper/gradle-wrapper-main-9.2.1.jar android/gradle/wrapper/gradle-wrapper.jar
 
           echo "🔎 Final wrapper locations:"
           find . -name "gradle-wrapper.jar" -print
