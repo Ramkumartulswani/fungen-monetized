@@ -101,6 +101,31 @@ jobs:
           cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
           cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
           
+          echo "=== Generating PackageList.java ==="
+          mkdir -p android/app/src/main/java/com/facebook/react
+          cat > android/app/src/main/java/com/facebook/react/PackageList.java << 'EOF'
+package com.facebook.react;
+
+import android.app.Application;
+import java.util.ArrayList;
+import java.util.Arrays;
+import com.facebook.react.ReactPackage;
+
+public class PackageList {
+  private Application application;
+  
+  public PackageList(Application application) {
+    this.application = application;
+  }
+  
+  public ArrayList<ReactPackage> getPackages() {
+    return new ArrayList<>(Arrays.asList(
+      new com.facebook.react.shell.MainReactPackage()
+    ));
+  }
+}
+EOF
+          
           echo "✓ Build configuration fixed"
       
       - name: Verify Gradle
