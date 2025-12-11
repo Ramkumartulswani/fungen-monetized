@@ -3,8 +3,7 @@ name: Android Release Build
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - 'android/**'
       - 'src/**'
@@ -14,23 +13,18 @@ jobs:
   build-android:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    environment: FungenEnv
-
 
     steps:
-      # Checkout source code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Node setup
       - name: Setup Node.js 18
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      # Detect package manager
       - name: Detect Package Manager
-        id: pkg-manager
+        id: pkg
         run: |
           if [ -f "yarn.lock" ]; then
             echo "manager=yarn" >> $GITHUB_OUTPUT
@@ -38,46 +32,38 @@ jobs:
             echo "manager=npm" >> $GITHUB_OUTPUT
           fi
 
-      # Install JS dependencies
       - name: Install Dependencies
         run: |
-          if [ "${{ steps.pkg-manager.outputs.manager }}" = "yarn" ]; then
+          if [ "${{ steps.pkg.outputs.manager }}" = "yarn" ]; then
             yarn install --frozen-lockfile
           else
             npm ci || npm install
           fi
 
-      # Setup JDK
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
+          cache: gradle
 
-      # -------------------------------
-      # ✅ FIXED ANDROID SDK BLOCK
-      # -------------------------------
+      # --- ANDROID SDK (NO PACKAGES HERE!) ---
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
           accept-android-sdk-licenses: false
           cmdline-tools-version: 12266719
-      
-      # FORCE INSTALL REQUIRED PACKAGES (no YAML formatting issues)
-      - name: Install Android SDK Packages
+
+      - name: Install SDK Packages
         run: |
           yes | sdkmanager --sdk_root=$ANDROID_HOME "platform-tools"
           yes | sdkmanager --sdk_root=$ANDROID_HOME "build-tools;34.0.0"
           yes | sdkmanager --sdk_root=$ANDROID_HOME "platforms;android-34"
-      
-      - name: Accept Android SDK licenses
+
+      - name: Accept Licenses
         run: yes | sdkmanager --licenses --sdk_root=$ANDROID_HOME
 
-
-      # -------------------------------
-      # Keystore setup
-      # -------------------------------
+      # --- KEYSTORE ---
       - name: Setup Keystore
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -85,37 +71,25 @@ jobs:
           if [ -n "$KEYSTORE_B64" ]; then
             echo "$KEYSTORE_B64" | base64 --decode > android/app/fungen-key.keystore
           else
-            echo "⚠️ No keystore provided — generating one automatically."
-            keytool -genkeypair \
-              -noprompt \
+            echo "No keystore provided, generating..."
+            keytool -genkeypair -noprompt \
               -alias fungen-key-alias \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
+              -keyalg RSA -keysize 2048 -validity 10000 \
               -storetype PKCS12 \
               -keystore android/app/fungen-key.keystore \
-              -storepass android \
-              -keypass android \
+              -storepass android -keypass android \
               -dname "CN=FunGen, OU=Dev, O=FunGen, L=Mumbai, ST=Maharashtra, C=IN"
             mkdir -p keystore-backup
             cp android/app/fungen-key.keystore keystore-backup/
           fi
 
-
-
-
-      # Gradle permission
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      # Verify gradle setup
-      - name: Verify Gradle Setup
+      - name: Verify Gradle
         working-directory: android
         run: ./gradlew --version
 
-      # -------------------------------
-      # BUILD AAB
-      # -------------------------------
       - name: Build AAB
         working-directory: android
         run: ./gradlew bundleRelease --stacktrace --info
@@ -124,33 +98,13 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'fungen-key-alias' }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'android' }}
 
-      # Debug output
-      - name: List Build Outputs
-        if: always()
-        run: |
-          echo "=== Checking build outputs ==="
-          ls -R android/app/build/outputs || echo "❌ No outputs found"
+      - name: List Outputs
+        run: ls -R android/app/build/outputs || echo "❌ No outputs"
 
-      # Upload AAB artifact
-      - name: Upload AAB Artifact
-        if: success()
+      - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
           name: FunGen-AAB-${{ github.sha }}
           path: android/app/build/outputs/bundle/release/*.aab
-          retention-days: 30
           if-no-files-found: error
-
-      # Upload keystore if generated
-      - name: Upload Generated Keystore
-        if: success() && hashFiles('keystore-backup/fungen-key.keystore') != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: FunGen-Keystore-BACKUP-${{ github.sha }}
-          path: keystore-backup/fungen-key.keystore
-          retention-days: 90
-
-      # Cleanup
-      - name: Cleanup Keystore
-        if: always()
-        run: rm -f android/app/fungen-key.keystore keystore-backup/fungen-key.keystore
+          retention-days: 30
