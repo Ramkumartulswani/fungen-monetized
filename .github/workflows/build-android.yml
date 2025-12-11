@@ -8,33 +8,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
-
-      - name: Show files BEFORE unzip
-        run: ls -R .
 
       - name: Install unzip
         run: sudo apt-get install -y unzip
 
-      - name: Extract ZIP
+      - name: Show files before unzip
+        run: ls -lah .
+
+      - name: Unzip project
         run: |
           unzip -o fungen-rn73-final.zip -d extracted
-          echo "---- AFTER EXTRACT ----"
+          echo "==== AFTER UNZIP ===="
           ls -R extracted
 
-      - name: Move project files to root (auto-detect root folder)
+      # ✔ FIXED: Copy entire project root
+      - name: Copy full project to root
         run: |
-          # Detect nested folder inside ZIP
-          ROOT_DIR=$(find extracted -maxdepth 2 -mindepth 1 -type d | head -n 1)
-          echo "Detected project folder: $ROOT_DIR"
-
-          # Move all extracted files to repo root
-          cp -R $ROOT_DIR/* .
-
-          # Cleanup
+          cp -R extracted/* .
           rm -rf extracted
           rm fungen-rn73-final.zip
+          echo "==== ROOT AFTER COPY ===="
+          ls -lah .
 
-      - name: Show files AFTER unzip
-        run: ls -R .
