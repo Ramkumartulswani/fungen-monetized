@@ -111,30 +111,6 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      - name: Fix gradlew DEFAULT_JVM_OPTS
-        run: |
-          echo "=== Original gradlew JVM options ==="
-          grep DEFAULT_JVM_OPTS android/gradlew || echo "Not found"
-          
-          echo ""
-          echo "=== Creating fixed gradlew ==="
-          
-          # Use awk to replace the line
-          awk '
-            /DEFAULT_JVM_OPTS=/ {
-              print "DEFAULT_JVM_OPTS=\"-Xmx512m -Xms256m\""
-              next
-            }
-            { print }
-          ' android/gradlew > android/gradlew.fixed
-          
-          mv android/gradlew.fixed android/gradlew
-          chmod +x android/gradlew
-          
-          echo "✓ Fixed gradlew"
-          echo "New DEFAULT_JVM_OPTS line:"
-          grep DEFAULT_JVM_OPTS android/gradlew
-
       - name: Configure gradle.properties for CI
         run: |
           echo "=== Current gradle.properties ==="
