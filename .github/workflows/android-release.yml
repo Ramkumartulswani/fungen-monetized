@@ -53,25 +53,38 @@ jobs:
       # ---------------------------------------------------------
       # Keystore
       # ---------------------------------------------------------
-      - name: Setup Keystore
+      - name: Setup Keystore (use secrets or defaults)
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'Fungen@2025' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'Fungen@2025' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'fungen-key-alias' }}
         run: |
           mkdir -p android/app
+      
           if [ -n "$KEYSTORE_B64" ]; then
+            echo "✓ Using keystore from secrets"
             echo "$KEYSTORE_B64" | base64 --decode > android/app/fungen-key.keystore
           else
+            echo "⚠️ No keystore secret found — generating default keystore..."
+      
             keytool -genkeypair \
-              -alias fungen-key-alias \
+              -alias "$KEY_ALIAS" \
               -keyalg RSA \
               -keysize 2048 \
               -validity 10000 \
               -storetype PKCS12 \
               -keystore android/app/fungen-key.keystore \
-              -storepass android \
-              -keypass android \
-              -dname "CN=FunGen, OU=Dev, O=FunGen, L=Mumbai, ST=Maharashtra, C=IN"
+              -storepass "$KEYSTORE_PASSWORD" \
+              -keypass "$KEY_PASSWORD" \
+              -dname "CN=FunGen, OU=Mobile, O=FunGen Apps, L=Mumbai, ST=Maharashtra, C=IN" \
+              -noprompt
+      
+            mkdir -p keystore-backup
+            cp android/app/fungen-key.keystore keystore-backup/
+            echo "✔ Generated default keystore (saved in artifacts)"
           fi
+
 
       - name: Make Gradle executable
         run: chmod +x android/gradlew
