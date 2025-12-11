@@ -41,11 +41,66 @@ jobs:
             -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass Fungen@2025 -keypass Fungen@2025 \
             -dname "CN=FunGen, OU=Mobile, O=FunGen, L=Mumbai, ST=MH, C=IN"
+          
+          echo "✓ Keystore created"
+          ls -lh android/app/fungen-key.keystore
       
       - name: Fix gradlew
         run: |
+          echo "=== Current DEFAULT_JVM_OPTS ==="
+          grep DEFAULT_JVM_OPTS android/gradlew || true
+          
           sed -i 's/DEFAULT_JVM_OPTS=.*/DEFAULT_JVM_OPTS="-Xmx512m -Xms256m"/' android/gradlew
           chmod +x android/gradlew
+          
+          echo "=== Fixed DEFAULT_JVM_OPTS ==="
+          grep DEFAULT_JVM_OPTS android/gradlew
+      
+      - name: Fix Gradle Wrapper
+        run: |
+          echo "=== Using Gradle 9.2.1 ==="
+          GRADLE_VERSION="9.2.1"
+          
+          echo "=== Removing corrupt wrapper JAR ==="
+          rm -f android/gradle/wrapper/gradle-wrapper.jar
+          
+          echo "=== Downloading Gradle 9.2.1 wrapper JAR from Maven ==="
+          mkdir -p android/gradle/wrapper
+          cd android/gradle/wrapper
+          
+          # Try Maven first (most reliable)
+          curl -f -L "https://repo1.maven.org/maven2/org/gradle/gradle-wrapper/9.2.1/gradle-wrapper-9.2.1.jar" \
+            -o gradle-wrapper.jar || {
+            echo "Maven failed, trying direct distribution download..."
+            cd ../../..
+            curl -L "https://services.gradle.org/distributions/gradle-9.2.1-bin.zip" -o gradle-temp.zip
+            unzip -q gradle-temp.zip "gradle-9.2.1/lib/gradle-wrapper-9.2.1.jar"
+            cp gradle-9.2.1/lib/gradle-wrapper-9.2.1.jar android/gradle/wrapper/gradle-wrapper.jar
+            rm -rf gradle-9.2.1 gradle-temp.zip
+            cd android/gradle/wrapper
+          }
+          
+          echo "=== Verifying wrapper JAR ==="
+          ls -lh gradle-wrapper.jar
+          
+          echo "=== Ensuring gradle-wrapper.properties is correct ==="
+          cat > gradle-wrapper.properties << 'EOF'
+distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\://services.gradle.org/distributions/gradle-9.2.1-all.zip
+networkTimeout=10000
+validateDistributionUrl=true
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+EOF
+          
+          echo "✓ gradle-wrapper.properties configured"
+      
+      - name: Verify Gradle
+        working-directory: android
+        run: |
+          echo "=== Gradle Version ==="
+          ./gradlew --version
       
       - name: Build AAB
         working-directory: android
@@ -53,10 +108,24 @@ jobs:
           KEYSTORE_PASSWORD: Fungen@2025
           KEY_ALIAS: fungen-key-alias
           KEY_PASSWORD: Fungen@2025
-        run: ./gradlew bundleRelease --stacktrace
+        run: ./gradlew bundleRelease --stacktrace --no-daemon
+      
+      - name: List outputs
+        if: always()
+        run: |
+          echo "=== Searching for AAB ==="
+          find android -name "*.aab" || echo "No AAB found"
+          
+          if [ -d "android/app/build/outputs" ]; then
+            echo "=== Build outputs ==="
+            ls -R android/app/build/outputs
+          fi
       
       - name: Upload AAB
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
+          name: FunGen-AAB-${{ github.sha }}
           path: android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 30
