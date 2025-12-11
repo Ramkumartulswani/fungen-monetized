@@ -1,0 +1,3 @@
+#!/bin/sh
+echo 'Placeholder gradlew — run gradle wrapper --gradle-version 8.1.1 to generate real wrapper in CI.'
+exit 0
