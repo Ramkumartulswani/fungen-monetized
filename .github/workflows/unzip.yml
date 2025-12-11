@@ -1,0 +1,32 @@
+name: Unzip RN Project
+
+on:
+  workflow_dispatch:
+
+jobs:
+  unzip:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install unzip
+        run: sudo apt-get install -y unzip
+
+      - name: Show files before unzip
+        run: ls -lah .
+
+      - name: Extract ZIP (copy entire project)
+        run: |
+          rm -rf extracted
+          unzip -o fungen-rn73-final.zip -d extracted
+          echo "==== CONTENTS OF extracted/ ===="
+          ls -R extracted
+
+      - name: Copy full project to root
+        run: |
+          cp -R extracted/* .
+          rm -rf extracted
+          echo "==== ROOT AFTER COPY ===="
+          ls -lah .
