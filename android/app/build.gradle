@@ -1,31 +1,40 @@
-plugins {
-    id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
-}
+apply plugin: "com.android.application"
+apply plugin: "kotlin-android"
 
 android {
     namespace "com.ramkumar.fungen"
-    compileSdk 33
+    compileSdkVersion 34
 
     defaultConfig {
         applicationId "com.ramkumar.fungen"
-        minSdk 21
-        targetSdk 33
+        minSdkVersion 23
+        targetSdkVersion 34
         versionCode 1
         versionName "1.0"
     }
 
+    signingConfigs {
+        release {
+            if (System.getenv("KEYSTORE_PASSWORD")) {
+                storeFile file("fungen-key.keystore")
+                storePassword System.getenv("KEYSTORE_PASSWORD")
+                keyAlias System.getenv("KEY_ALIAS")
+                keyPassword System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            shrinkResources false
         }
     }
 }
 
 dependencies {
-    implementation fileTree(dir: 'libs', include: ['*.jar'])
-    implementation 'com.facebook.react:react-native:+'
-    implementation 'com.google.android.gms:play-services-ads:22.1.0'
-    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.8.22"
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'com.facebook.react:react-android:+'
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:${kotlinVersion}"
 }
