@@ -1,0 +1,1 @@
+const jokes=["Why don't scientists trust atoms? Because they make up everything.","I told my computer I needed a break, and it said 'No problem — I'll go to sleep.'","Be the kind of person your dog thinks you are."]; export function getRandomItem(){return jokes[Math.floor(Math.random()*jokes.length)];} export async function fetchRemotePrompts(){return Promise.resolve(jokes);}
