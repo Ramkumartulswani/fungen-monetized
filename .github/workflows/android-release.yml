@@ -111,17 +111,6 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      - name: Fix gradlew DEFAULT_JVM_OPTS
-        run: |
-          echo "=== Fixing gradlew JVM options ==="
-          
-          # Fix the DEFAULT_JVM_OPTS line - remove inner quotes
-          sed -i "s/DEFAULT_JVM_OPTS='\"-Xmx64m\" \"-Xms64m\"'/DEFAULT_JVM_OPTS=\"-Xmx512m -Xms256m\"/g" android/gradlew
-          
-          echo "✓ Fixed gradlew"
-          echo "New DEFAULT_JVM_OPTS line:"
-          grep DEFAULT_JVM_OPTS android/gradlew
-
       - name: Configure gradle.properties for CI
         run: |
           echo "=== Current gradle.properties ==="
