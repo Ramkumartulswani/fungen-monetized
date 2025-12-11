@@ -8,11 +8,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 2: Unzip the React Native project
+      # UNZIP PROJECT
       - name: Unzip project
         run: |
           sudo apt-get install unzip
@@ -21,7 +20,7 @@ jobs:
           rm -rf extracted
           rm fungen-rn73-final.zip
 
-      # Step 3: Setup Node
+      # NODE
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -30,41 +29,44 @@ jobs:
       - name: Install node modules
         run: npm install
 
-      # Step 4: Setup Java
+      # JAVA
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
           java-version: "17"
 
-      # Step 5: Install Android SDK
+      # ANDROID SDK
       - name: Install Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install platforms & tools
+      - name: Install SDK Platforms
         run: |
-          sdkmanager "platform-tools" \
-                     "platforms;android-33" \
-                     "build-tools;33.0.2"
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
           yes | sdkmanager --licenses
 
-      # Step 6: Generate Gradle Wrapper
-      - name: Generate Gradle Wrapper
+      # 🔥 MANUALLY INSTALL GRADLE 8.1.1 (the correct version)
+      - name: Download Gradle 8.1.1
+        run: |
+          wget https://services.gradle.org/distributions/gradle-8.1.1-bin.zip
+          unzip gradle-8.1.1-bin.zip -d /tmp/gradle8
+          export PATH="/tmp/gradle8/gradle-8.1.1/bin:$PATH"
+
+      # 🔥 GENERATE WRAPPER USING GRADLE 8.1.1
+      - name: Generate Gradle Wrapper (correct version)
         working-directory: android
         run: |
-          ./gradlew wrapper --gradle-version 8.1.1 || true
+          /tmp/gradle8/gradle-8.1.1/bin/gradle wrapper --gradle-version 8.1.1
           chmod +x gradlew
 
-      # Step 7: Build Release AAB
-      - name: Build Android Release AAB
+      # BUILD USING CORRECT WRAPPER
+      - name: Build Release AAB
         working-directory: android
         run: ./gradlew --no-daemon --warning-mode all bundleRelease
 
-
-      # Step 8: Upload AAB as artifact
+      # ARTIFACT
       - name: Upload AAB Artifact
         uses: actions/upload-artifact@v4
         with:
           name: FunGen-AAB
           path: android/app/build/outputs/bundle/release/*.aab
-
