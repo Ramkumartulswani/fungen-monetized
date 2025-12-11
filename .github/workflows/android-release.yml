@@ -2,224 +2,61 @@ name: Android Release Build
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'android/**'
-      - 'src/**'
-      - 'package.json'
 
 jobs:
   build-android:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-
+    
     steps:
-      # ---------------------------------------------------------
-      # CHECKOUT
-      # ---------------------------------------------------------
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v4
-
-      # ---------------------------------------------------------
-      # NODE
-      # ---------------------------------------------------------
-      - name: Setup Node.js
+      
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 18
-
-      - name: Install JS dependencies
+      
+      - name: Install dependencies
         run: npm ci || npm install
-
-      # ---------------------------------------------------------
-      # JAVA
-      # ---------------------------------------------------------
-      - name: Setup Java 17
+      
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
           cache: gradle
-
-      # ---------------------------------------------------------
-      # ANDROID SDK (using action - simpler!)
-      # ---------------------------------------------------------
+      
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-
-      - name: Accept Android Licenses
+      
+      - name: Accept licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+      
+      - name: Setup keystore
         run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          yes | $ANDROID_HOME/cmdline-tools/*/bin/sdkmanager --licenses || true
-
-      # ---------------------------------------------------------
-      # KEYSTORE
-      # ---------------------------------------------------------
-      - name: Setup Keystore
-        env:
-          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'Fungen@2025' }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'Fungen@2025' }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'fungen-key-alias' }}
+          keytool -genkeypair -v -storetype PKCS12 \
+            -keystore android/app/fungen-key.keystore \
+            -alias fungen-key-alias \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass Fungen@2025 -keypass Fungen@2025 \
+            -dname "CN=FunGen, OU=Mobile, O=FunGen, L=Mumbai, ST=MH, C=IN"
+      
+      - name: Fix gradlew
         run: |
-          mkdir -p android/app
-
-          if [ -n "$KEYSTORE_B64" ]; then
-            echo "✓ Using keystore from secrets"
-            echo "$KEYSTORE_B64" | base64 --decode > android/app/fungen-key.keystore
-          else
-            echo "⚠️ Generating new keystore..."
-            keytool -genkeypair \
-              -alias "$KEY_ALIAS" \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -storetype PKCS12 \
-              -keystore android/app/fungen-key.keystore \
-              -storepass "$KEYSTORE_PASSWORD" \
-              -keypass "$KEY_PASSWORD" \
-              -dname "CN=FunGen, OU=Mobile, O=FunGen Apps, L=Mumbai, ST=Maharashtra, C=IN" \
-              -noprompt
-
-            mkdir -p keystore-backup
-            cp android/app/fungen-key.keystore keystore-backup/
-            echo "✔ Keystore generated and backed up"
-          fi
-
-          # Verify keystore exists
-          if [ -f "android/app/fungen-key.keystore" ]; then
-            echo "✓ Keystore verified at android/app/fungen-key.keystore"
-            ls -lh android/app/fungen-key.keystore
-          else
-            echo "❌ Keystore not found!"
-            exit 1
-          fi
-
-      # ---------------------------------------------------------
-      # FIX gradlew JVM options
-      # ---------------------------------------------------------
-      - name: Fix gradlew JVM options
-        run: |
-          echo "=== Checking current gradlew DEFAULT_JVM_OPTS ==="
-          grep "DEFAULT_JVM_OPTS" android/gradlew || echo "Not found"
-          
-          # Use Python to fix the line (more reliable than sed/awk)
-          python3 << 'PYTHON_SCRIPT'
-import re
-
-with open('android/gradlew', 'r') as f:
-    content = f.read()
-
-# Replace the problematic DEFAULT_JVM_OPTS line
-content = re.sub(
-    r"DEFAULT_JVM_OPTS=.*",
-    'DEFAULT_JVM_OPTS="-Xmx512m -Xms256m"',
-    content
-)
-
-with open('android/gradlew', 'w') as f:
-    f.write(content)
-
-print("✓ Fixed gradlew DEFAULT_JVM_OPTS")
-PYTHON_SCRIPT
-          
-          echo "=== New DEFAULT_JVM_OPTS ==="
-          grep "DEFAULT_JVM_OPTS" android/gradlew
-
-      - name: Make gradlew executable
-        run: chmod +x android/gradlew
-
-      # ---------------------------------------------------------
-      # GRADLE PROPERTIES FOR CI
-      # ---------------------------------------------------------
-      - name: Configure gradle.properties
-        run: |
-          cat > android/gradle.properties << 'EOF'
-# CI-optimized settings
-org.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=512m
-org.gradle.daemon=false
-org.gradle.parallel=true
-
-# Android
-android.useAndroidX=true
-android.enableJetifier=true
-
-# Kotlin
-kotlin.code.style=official
-EOF
-          
-          echo "✓ gradle.properties configured for CI"
-
-      # ---------------------------------------------------------
-      # VERIFY SETUP
-      # ---------------------------------------------------------
-      - name: Verify Gradle Setup
-        working-directory: android
-        run: |
-          echo "=== Gradle Version ==="
-          ./gradlew --version
-          echo ""
-          echo "=== Available bundle tasks ==="
-          ./gradlew tasks --all | grep -i bundle || echo "No bundle tasks found"
-
-      # ---------------------------------------------------------
-      # BUILD AAB
-      # ---------------------------------------------------------
-      - name: Build Android AAB
+          sed -i 's/DEFAULT_JVM_OPTS=.*/DEFAULT_JVM_OPTS="-Xmx512m -Xms256m"/' android/gradlew
+          chmod +x android/gradlew
+      
+      - name: Build AAB
         working-directory: android
         env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'Fungen@2025' }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'fungen-key-alias' }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'Fungen@2025' }}
-        run: |
-          echo "=== Building AAB ==="
-          ./gradlew bundleRelease --stacktrace --info --no-daemon
-
-      # ---------------------------------------------------------
-      # DEBUG OUTPUT
-      # ---------------------------------------------------------
-      - name: List Build Outputs
-        if: always()
-        run: |
-          echo "=== Searching for AAB files ==="
-          find android -name "*.aab" || echo "No AAB found"
-          echo ""
-          if [ -d "android/app/build/outputs" ]; then
-            echo "=== Build outputs ==="
-            ls -R android/app/build/outputs
-          else
-            echo "❌ No build/outputs directory"
-          fi
-
-      # ---------------------------------------------------------
-      # UPLOAD AAB
-      # ---------------------------------------------------------
-      - name: Upload AAB Artifact
-        if: success()
+          KEYSTORE_PASSWORD: Fungen@2025
+          KEY_ALIAS: fungen-key-alias
+          KEY_PASSWORD: Fungen@2025
+        run: ./gradlew bundleRelease --stacktrace
+      
+      - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: FunGen-AAB-${{ github.sha }}
+          name: app-release
           path: android/app/build/outputs/bundle/release/*.aab
-          if-no-files-found: error
-          retention-days: 30
-
-      # ---------------------------------------------------------
-      # UPLOAD KEYSTORE BACKUP (if generated)
-      # ---------------------------------------------------------
-      - name: Upload Keystore Backup
-        if: success() && hashFiles('keystore-backup/fungen-key.keystore') != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: FunGen-Keystore-BACKUP-${{ github.sha }}
-          path: keystore-backup/fungen-key.keystore
-          if-no-files-found: ignore
-          retention-days: 90
-
-      # ---------------------------------------------------------
-      # CLEANUP
-      # ---------------------------------------------------------
-      - name: Cleanup
-        if: always()
-        run: rm -f android/app/fungen-key.keystore
