@@ -55,18 +55,19 @@ jobs:
       # ---------------------------------------------------------
       - name: Restore Working Gradle Wrapper JAR
         run: |
-          echo "Deleting broken wrapper jar..."
+          echo "Removing old wrapper jar..."
           rm -f android/gradle/wrapper/gradle-wrapper.jar
-
-          echo "Downloading official Gradle wrapper..."
+      
+          echo "Downloading Gradle 8.1.1 distribution..."
           curl -L https://services.gradle.org/distributions/gradle-8.1.1-bin.zip -o gradle.zip
-
+      
           echo "Extracting wrapper jar..."
           unzip -j gradle.zip "gradle-8.1.1/lib/plugins/gradle-wrapper-8.1.1.jar" -d android/gradle/wrapper/
-
+      
           mv android/gradle/wrapper/gradle-wrapper-8.1.1.jar android/gradle/wrapper/gradle-wrapper.jar
+      
+          echo "✔ Wrapper replaced"
 
-          echo "✔ Gradle wrapper restored successfully"
 
       # ---------------------------------------------------------
       # Keystore
