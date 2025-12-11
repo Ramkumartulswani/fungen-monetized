@@ -71,8 +71,10 @@ jobs:
 
       - name: Accept Android Licenses
         run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          yes | $ANDROID_HOME/cmdline-tools/*/bin/sdkmanager --licenses || true
+          yes | sdkmanager --licenses
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+          yes | $ANDROID_HOME/cmdline-tools/*/bin/sdkmanager --licenses
+
 
       # -------------------------------
       # KEYSTORE SETUP
