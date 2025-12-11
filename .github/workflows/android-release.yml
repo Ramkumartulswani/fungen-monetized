@@ -113,10 +113,23 @@ jobs:
 
       - name: Fix gradlew DEFAULT_JVM_OPTS
         run: |
-          echo "=== Fixing gradlew JVM options ==="
+          echo "=== Original gradlew JVM options ==="
+          grep DEFAULT_JVM_OPTS android/gradlew || echo "Not found"
           
-          # Fix the DEFAULT_JVM_OPTS line - remove inner quotes
-          sed -i "s/DEFAULT_JVM_OPTS='\"-Xmx64m\" \"-Xms64m\"'/DEFAULT_JVM_OPTS=\"-Xmx512m -Xms256m\"/g" android/gradlew
+          echo ""
+          echo "=== Creating fixed gradlew ==="
+          
+          # Use awk to replace the line
+          awk '
+            /DEFAULT_JVM_OPTS=/ {
+              print "DEFAULT_JVM_OPTS=\"-Xmx512m -Xms256m\""
+              next
+            }
+            { print }
+          ' android/gradlew > android/gradlew.fixed
+          
+          mv android/gradlew.fixed android/gradlew
+          chmod +x android/gradlew
           
           echo "✓ Fixed gradlew"
           echo "New DEFAULT_JVM_OPTS line:"
