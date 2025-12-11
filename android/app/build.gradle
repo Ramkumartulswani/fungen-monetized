@@ -1,0 +1,31 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace "com.ramkumar.fungen"
+    compileSdk 33
+
+    defaultConfig {
+        applicationId "com.ramkumar.fungen"
+        minSdk 21
+        targetSdk 33
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation 'com.facebook.react:react-native:+'
+    implementation 'com.google.android.gms:play-services-ads:22.1.0'
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.8.22"
+}
