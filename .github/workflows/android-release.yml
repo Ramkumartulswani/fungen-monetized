@@ -6,9 +6,9 @@ on:
     branches:
       - main
     paths:
-      - 'android/**'
-      - 'src/**'
-      - 'package.json'
+      - "android/**"
+      - "src/**"
+      - "package.json"
 
 jobs:
   build-android:
@@ -18,7 +18,6 @@ jobs:
     env:
       ANDROID_HOME: /usr/local/android-sdk
       ANDROID_SDK_ROOT: /usr/local/android-sdk
-      # Defaults (override with repo secrets if you want)
       DEFAULT_KEYSTORE_PASSWORD: Fungen@2025
       DEFAULT_KEY_PASSWORD: Fungen@2025
       DEFAULT_KEY_ALIAS: fungen-key-alias
@@ -64,6 +63,7 @@ jobs:
           echo "⬇️ Downloading Android command line tools..."
           wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline.zip
           unzip -q cmdline.zip -d $ANDROID_HOME/cmdline-tools
+
           if [ -d "$ANDROID_HOME/cmdline-tools/cmdline-tools" ]; then
             mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
           else
@@ -106,6 +106,7 @@ jobs:
               -keypass "$KEY_PASSWORD" \
               -dname "CN=FunGen, OU=Mobile, O=FunGen Apps, L=Mumbai, ST=Maharashtra, C=IN" \
               -noprompt
+
             mkdir -p keystore-backup
             cp android/app/fungen-key.keystore keystore-backup/
             echo "✔ Generated keystore and copied to keystore-backup/"
@@ -152,43 +153,42 @@ EOF
         run: |
           set -euo pipefail
           mkdir -p android/gradle/wrapper
-          echo "🔍 listing any existing gradle-wrapper.jar files..."
+
+          echo "🔍 listing existing gradle-wrapper.jar"
           find . -name "gradle-wrapper.jar" -print || true
 
-          echo "🗑️ removing any existing gradle-wrapper.jar"
+          echo "🗑️ removing existing gradle-wrapper.jar"
           find . -name "gradle-wrapper.jar" -delete || true
 
-          echo "⬇️ Downloading Gradle 9.2.1 (CI-safe CDN) with retries..."
+          echo "⬇️ Downloading Gradle 9.2.1"
           URL="https://downloads.gradle-dn.com/distributions/gradle-9.2.1-all.zip"
           curl --retry 5 --retry-delay 5 --location --fail "$URL" -o gradle.zip
 
-          echo "📦 Checking downloaded file size (bytes):"
-          stat -c%s gradle.zip || true
-
           SIZE=$(stat -c%s gradle.zip || echo 0)
           if [ "$SIZE" -lt 1048576 ]; then
-            echo "⚠️ gradle.zip looks small ($SIZE bytes) — printing first 200 bytes for debug"
+            echo "⚠️ gradle.zip looks too small — printing preview"
             head -c 200 gradle.zip | sed 's/<[^>]*>//g' || true
             exit 20
           fi
 
-          echo "📦 Extracting gradle-wrapper-shared-9.2.1.jar (correct path for 9.2.1)"
+          echo "📦 Extracting wrapper jar"
           unzip -j gradle.zip "gradle-9.2.1/lib/gradle-wrapper-shared-9.2.1.jar" -d android/gradle/wrapper/
 
           if [ ! -f android/gradle/wrapper/gradle-wrapper-shared-9.2.1.jar ]; then
-            echo "❌ Expected jar not found — listing archive contents:"
-            unzip -l gradle.zip | sed -n '1,200p' || true
+            echo "❌ Extracted jar missing — listing zip"
+            unzip -l gradle.zip | sed -n '1,200p'
             exit 21
           fi
 
           mv android/gradle/wrapper/gradle-wrapper-shared-9.2.1.jar android/gradle/wrapper/gradle-wrapper.jar
-          echo "🔎 Final wrapper path:"
-          ls -l android/gradle/wrapper/gradle-wrapper.jar || true
+
+          echo "🔎 Final wrapper jar:"
+          ls -l android/gradle/wrapper/gradle-wrapper.jar
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      - name: Verify Gradle (quick)
+      - name: Verify Gradle
         working-directory: android
         run: |
           ./gradlew --version || true
