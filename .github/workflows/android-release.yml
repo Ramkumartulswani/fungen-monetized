@@ -5,6 +5,10 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'android/**'
+      - 'src/**'
+      - 'package.json'
 
 jobs:
   build-android:
@@ -12,17 +16,42 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - name: Checkout repo
+      # ---------------------------------------
+      # CHECKOUT
+      # ---------------------------------------
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      # ---------------------------------------
+      # NODE SETUP
+      # ---------------------------------------
+      - name: Setup Node.js 18
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      - name: Install JS Dependencies
-        run: npm install
+      # Detect package manager
+      - name: Detect Package Manager
+        id: pkg-manager
+        run: |
+          if [ -f "yarn.lock" ]; then
+            echo "manager=yarn" >> $GITHUB_OUTPUT
+          else
+            echo "manager=npm" >> $GITHUB_OUTPUT
+          fi
 
+      # Install dependencies
+      - name: Install Dependencies
+        run: |
+          if [ "${{ steps.pkg-manager.outputs.manager }}" = "yarn" ]; then
+            yarn install --frozen-lockfile
+          else
+            npm ci || npm install
+          fi
+
+      # ---------------------------------------
+      # JAVA SETUP
+      # ---------------------------------------
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
@@ -30,73 +59,125 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      # ---------------------------------------------------------
-      # ✅ THIS BLOCK FIXES EVERYTHING – MANUAL SDK INSTALLER
-      # ---------------------------------------------------------
-      - name: Install Android SDK
+      # ---------------------------------------
+      # ANDROID SDK SETUP
+      # ---------------------------------------
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: false
+          cmdline-tools-version: 12266719
+
+      # Install required packages explicitly
+      - name: Install Android SDK Packages
         run: |
-          sudo mkdir -p /usr/local/android-sdk
-          sudo chown $USER:$USER /usr/local/android-sdk
+          yes | sdkmanager --sdk_root=$ANDROID_HOME "platform-tools"
+          yes | sdkmanager --sdk_root=$ANDROID_HOME "build-tools;34.0.0"
+          yes | sdkmanager --sdk_root=$ANDROID_HOME "platforms;android-34"
 
-          wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline.zip
-          unzip -q cmdline.zip -d /usr/local/android-sdk/cmdline-tools
-          mv /usr/local/android-sdk/cmdline-tools/cmdline-tools /usr/local/android-sdk/cmdline-tools/latest
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses --sdk_root=$ANDROID_HOME
 
-          export ANDROID_HOME=/usr/local/android-sdk
-          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
-
-          yes | sdkmanager --licenses
-          yes | sdkmanager "platform-tools"
-          yes | sdkmanager "platforms;android-34"
-          yes | sdkmanager "build-tools;34.0.0"
-
-      # ---------------------------------------------------------
-      # Keystore
-      # ---------------------------------------------------------
-      - name: Setup Keystore (use secrets or defaults)
+      # ---------------------------------------
+      # KEYSTORE HANDLING
+      # ---------------------------------------
+      - name: Setup Keystore
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'Fungen@2025' }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'Fungen@2025' }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'fungen-key-alias' }}
         run: |
           mkdir -p android/app
-      
+
           if [ -n "$KEYSTORE_B64" ]; then
             echo "✓ Using keystore from secrets"
             echo "$KEYSTORE_B64" | base64 --decode > android/app/fungen-key.keystore
           else
             echo "⚠️ No keystore secret found — generating default keystore..."
-      
             keytool -genkeypair \
-              -alias "$KEY_ALIAS" \
+              -noprompt \
+              -alias fungen-key-alias \
               -keyalg RSA \
               -keysize 2048 \
               -validity 10000 \
               -storetype PKCS12 \
               -keystore android/app/fungen-key.keystore \
-              -storepass "$KEYSTORE_PASSWORD" \
-              -keypass "$KEY_PASSWORD" \
-              -dname "CN=FunGen, OU=Mobile, O=FunGen Apps, L=Mumbai, ST=Maharashtra, C=IN" \
-              -noprompt
-      
+              -storepass android \
+              -keypass android \
+              -dname "CN=FunGen, OU=Mobile, O=FunGen Apps, L=Mumbai, ST=Maharashtra, C=IN"
+
             mkdir -p keystore-backup
             cp android/app/fungen-key.keystore keystore-backup/
+
             echo "✔ Generated default keystore (saved in artifacts)"
           fi
 
+      # ---------------------------------------
+      # FIX GRADLE WRAPPER JAR
+      # ---------------------------------------
+      - name: Ensure valid gradle-wrapper.jar
+        run: |
+          WRAPPER_JAR="android/gradle/wrapper/gradle-wrapper.jar"
 
+          echo "🔍 Checking gradle-wrapper.jar validity..."
+
+          if [ ! -f "$WRAPPER_JAR" ] || ! unzip -l "$WRAPPER_JAR" | grep -q "GradleWrapperMain.class"; then
+            echo "❗ Invalid or missing wrapper jar — downloading correct version (Gradle 8.1.1)..."
+
+            wget -q https://services.gradle.org/distributions/gradle-8.1.1-bin.zip -O /tmp/gradle.zip
+            unzip -q /tmp/gradle.zip -d /tmp/gradle-dist
+
+            cp /tmp/gradle-dist/gradle-8.1.1/lib/plugins/gradle-wrapper-8.1.1.jar "$WRAPPER_JAR"
+
+            echo "✔ gradle-wrapper.jar replaced with official Gradle 8.1.1"
+          else
+            echo "✔ gradle-wrapper.jar is valid"
+          fi
+
+      # ---------------------------------------
+      # GRADLE PERMISSIONS
+      # ---------------------------------------
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-
+      # ---------------------------------------
+      # BUILD RELEASE AAB
+      # ---------------------------------------
       - name: Build AAB
         working-directory: android
-        run: ./gradlew bundleRelease --stacktrace
+        run: ./gradlew bundleRelease --stacktrace --info
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'android' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'fungen-key-alias' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'android' }}
 
+      # ---------------------------------------
+      # SHOW OUTPUTS
+      # ---------------------------------------
+      - name: List Build Outputs
+        if: always()
+        run: ls -R android/app/build/outputs || echo "❌ No outputs found"
+
+      # ---------------------------------------
+      # UPLOAD ARTIFACT
+      # ---------------------------------------
       - name: Upload AAB Artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: FunGen-AAB
           path: android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
+
+      # Upload auto-generated keystore if needed
+      - name: Upload Generated Keystore
+        if: success() && hashFiles('keystore-backup/fungen-key.keystore') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: FunGen-Keystore-Backup
+          path: keystore-backup/fungen-key.keystore
+
+      # ---------------------------------------
+      # CLEANUP
+      # ---------------------------------------
+      - name: Cleanup
+        if: always()
+        run: rm -f android/app/fungen-key.keystore keystore-backup/fungen-key.keystore
