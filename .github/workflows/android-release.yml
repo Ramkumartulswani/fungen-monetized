@@ -16,8 +16,6 @@ jobs:
     timeout-minutes: 120
 
     env:
-      ANDROID_HOME: /usr/local/android-sdk
-      ANDROID_SDK_ROOT: /usr/local/android-sdk
       DEFAULT_KEYSTORE_PASSWORD: Fungen@2025
       DEFAULT_KEY_PASSWORD: Fungen@2025
       DEFAULT_KEY_ALIAS: fungen-key-alias
@@ -48,151 +46,82 @@ jobs:
             npm ci || npm install
           fi
 
-      - name: Setup Java 17 (Temurin)
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
           cache: gradle
 
-      - name: Install Android SDK (manual)
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android Licenses
         run: |
-          sudo mkdir -p $ANDROID_HOME
-          sudo chown $USER:$USER $ANDROID_HOME
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          yes | $ANDROID_HOME/cmdline-tools/*/bin/sdkmanager --licenses || true
 
-          echo "⬇️ Downloading Android command line tools..."
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline.zip
-          unzip -q cmdline.zip -d $ANDROID_HOME/cmdline-tools
-
-          if [ -d "$ANDROID_HOME/cmdline-tools/cmdline-tools" ]; then
-            mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
-          else
-            mkdir -p $ANDROID_HOME/cmdline-tools/latest
-            mv $ANDROID_HOME/cmdline-tools/* $ANDROID_HOME/cmdline-tools/latest || true
-          fi
-
-          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
-
-          echo "✔ Accepting licenses..."
-          yes | sdkmanager --licenses || true
-
-          echo "⬇️ Installing platform-tools, build-tools and platform"
-          yes | sdkmanager "platform-tools" || true
-          yes | sdkmanager "build-tools;34.0.0" || true
-          yes | sdkmanager "platforms;android-34" || true
-
-      - name: Setup Keystore (decode from secret or generate)
+      - name: Setup Keystore
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || env.DEFAULT_KEYSTORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || env.DEFAULT_KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS || env.DEFAULT_KEY_ALIAS }}
         run: |
-          mkdir -p android/app
-
           if [ -n "$KEYSTORE_B64" ]; then
-            echo "✓ Using provided keystore (decoded)"
+            echo "✓ Using provided keystore from secrets"
             echo "$KEYSTORE_B64" | base64 --decode > android/app/fungen-key.keystore
           else
-            echo "⚠️ No keystore secret found — generating keystore with defaults"
-            keytool -genkeypair \
+            echo "⚠️ Generating new keystore with default credentials"
+            keytool -genkeypair -v \
+              -storetype PKCS12 \
+              -keystore android/app/fungen-key.keystore \
               -alias "$KEY_ALIAS" \
               -keyalg RSA \
               -keysize 2048 \
               -validity 10000 \
-              -storetype PKCS12 \
-              -keystore android/app/fungen-key.keystore \
               -storepass "$KEYSTORE_PASSWORD" \
               -keypass "$KEY_PASSWORD" \
-              -dname "CN=FunGen, OU=Mobile, O=FunGen Apps, L=Mumbai, ST=Maharashtra, C=IN" \
-              -noprompt
-
+              -dname "CN=FunGen, OU=Mobile, O=FunGen Apps, L=Mumbai, ST=Maharashtra, C=IN"
+            
+            echo ""
+            echo "=========================================="
+            echo "⚠️  NEW KEYSTORE GENERATED!"
+            echo "=========================================="
+            echo "Credentials:"
+            echo "  Password: Fungen@2025"
+            echo "  Alias: fungen-key-alias"
+            echo ""
+            echo "SAVE THE KEYSTORE FROM ARTIFACTS!"
+            echo "=========================================="
+            
             mkdir -p keystore-backup
             cp android/app/fungen-key.keystore keystore-backup/
-            echo "✔ Generated keystore and copied to keystore-backup/"
           fi
-
-      - name: Ensure real gradlew script (replace placeholder if found)
-        run: |
-          if [ ! -f android/gradlew ] || grep -q "Placeholder gradlew" android/gradlew 2>/dev/null; then
-            echo "⚠️ Creating/Replacing android/gradlew with a proper wrapper script"
-            cat > android/gradlew <<'EOF'
-#!/usr/bin/env sh
-PRG="$0"
-while [ -h "$PRG" ] ; do
-  ls=`ls -ld "$PRG"`
-  link=`expr "$ls" : '.*-> \(.*\)$'`
-  if expr "$link" : '/.*' > /dev/null; then
-    PRG="$link"
-  else
-    PRG=`dirname "$PRG"`"/$link"
-  fi
-done
-SAVED="`pwd`"
-cd "`dirname \"$PRG\"`/.." >/dev/null
-APP_HOME="`pwd -P`"
-cd "$SAVED" >/dev/null
-CLASSPATH="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
-if [ -n "$JAVA_HOME" ] ; then
-  if [ -x "$JAVA_HOME/bin/java" ] ; then
-    JAVACMD="$JAVA_HOME/bin/java"
-  else
-    JAVACMD="$JAVA_HOME/jre/bin/java"
-  fi
-else
-  JAVACMD="java"
-fi
-exec "$JAVACMD" -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
-EOF
-            chmod +x android/gradlew
+          
+          # Verify keystore was created
+          if [ -f "android/app/fungen-key.keystore" ]; then
+            echo "✓ Keystore file exists at android/app/fungen-key.keystore"
+            ls -lh android/app/fungen-key.keystore
           else
-            echo "✓ android/gradlew appears valid"
+            echo "❌ Keystore file NOT found!"
+            exit 1
           fi
-
-      - name: Replace Gradle wrapper JAR (Gradle 9.2.1, CI-safe)
-        run: |
-          set -euo pipefail
-          mkdir -p android/gradle/wrapper
-
-          echo "🔍 listing existing gradle-wrapper.jar"
-          find . -name "gradle-wrapper.jar" -print || true
-
-          echo "🗑️ removing existing gradle-wrapper.jar"
-          find . -name "gradle-wrapper.jar" -delete || true
-
-          echo "⬇️ Downloading Gradle 9.2.1"
-          URL="https://downloads.gradle-dn.com/distributions/gradle-9.2.1-all.zip"
-          curl --retry 5 --retry-delay 5 --location --fail "$URL" -o gradle.zip
-
-          SIZE=$(stat -c%s gradle.zip || echo 0)
-          if [ "$SIZE" -lt 1048576 ]; then
-            echo "⚠️ gradle.zip looks too small — printing preview"
-            head -c 200 gradle.zip | sed 's/<[^>]*>//g' || true
-            exit 20
-          fi
-
-          echo "📦 Extracting wrapper jar"
-          unzip -j gradle.zip "gradle-9.2.1/lib/gradle-wrapper-shared-9.2.1.jar" -d android/gradle/wrapper/
-
-          if [ ! -f android/gradle/wrapper/gradle-wrapper-shared-9.2.1.jar ]; then
-            echo "❌ Extracted jar missing — listing zip"
-            unzip -l gradle.zip | sed -n '1,200p'
-            exit 21
-          fi
-
-          mv android/gradle/wrapper/gradle-wrapper-shared-9.2.1.jar android/gradle/wrapper/gradle-wrapper.jar
-
-          echo "🔎 Final wrapper jar:"
-          ls -l android/gradle/wrapper/gradle-wrapper.jar
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      - name: Verify Gradle
+      - name: Verify Gradle Setup
         working-directory: android
         run: |
-          ./gradlew --version || true
-          ./gradlew tasks --all | grep -i bundle || true
+          echo "=== Gradle Version ==="
+          ./gradlew --version
+          echo ""
+          echo "=== Available Tasks ==="
+          ./gradlew tasks --all | grep -i bundle || echo "No bundle tasks found"
+          echo ""
+          echo "=== Checking keystore location ==="
+          ls -la app/ | grep keystore || echo "No keystore visible in app/"
 
       - name: Build Android AAB
         working-directory: android
@@ -201,10 +130,29 @@ EOF
           KEY_ALIAS: ${{ secrets.KEY_ALIAS || env.DEFAULT_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || env.DEFAULT_KEY_PASSWORD }}
         run: |
-          ./gradlew bundleRelease --stacktrace --no-daemon --info
+          echo "=== Starting AAB build ==="
+          echo "Using credentials:"
+          echo "  KEYSTORE_PASSWORD: ${KEYSTORE_PASSWORD:0:3}***"
+          echo "  KEY_ALIAS: $KEY_ALIAS"
+          echo "  KEY_PASSWORD: ${KEY_PASSWORD:0:3}***"
+          echo ""
+          ./gradlew bundleRelease --stacktrace --info
+
+      - name: List Build Outputs
+        if: always()
+        run: |
+          echo "=== Searching for AAB files ==="
+          find android -name "*.aab" -o -name "*.apk" || echo "No AAB or APK found"
+          echo ""
+          echo "=== Build outputs directory ==="
+          if [ -d "android/app/build/outputs" ]; then
+            ls -R android/app/build/outputs
+          else
+            echo "❌ No outputs directory found"
+          fi
 
       - name: Upload AAB Artifact
-        if: always()
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: FunGen-AAB-${{ github.sha }}
@@ -212,11 +160,15 @@ EOF
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload Generated Keystore (if created)
-        if: always()
+      - name: Upload Generated Keystore
+        if: success() && hashFiles('keystore-backup/fungen-key.keystore') != ''
         uses: actions/upload-artifact@v4
         with:
-          name: FunGen-Keystore-${{ github.sha }}
+          name: FunGen-Keystore-BACKUP-${{ github.sha }}
           path: keystore-backup/fungen-key.keystore
           if-no-files-found: ignore
           retention-days: 90
+
+      - name: Cleanup
+        if: always()
+        run: rm -f android/app/fungen-key.keystore
