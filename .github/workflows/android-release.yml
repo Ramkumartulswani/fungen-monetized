@@ -61,13 +61,17 @@ jobs:
         with:
           accept-android-sdk-licenses: false
           cmdline-tools-version: 12266719
-          packages: |
-            platform-tools
-            build-tools;34.0.0
-            platforms;android-34
-
+      
+      # FORCE INSTALL REQUIRED PACKAGES (no YAML formatting issues)
+      - name: Install Android SDK Packages
+        run: |
+          yes | sdkmanager --sdk_root=$ANDROID_HOME "platform-tools"
+          yes | sdkmanager --sdk_root=$ANDROID_HOME "build-tools;34.0.0"
+          yes | sdkmanager --sdk_root=$ANDROID_HOME "platforms;android-34"
+      
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses --sdk_root=$ANDROID_HOME
+
 
       # -------------------------------
       # Keystore setup
