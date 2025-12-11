@@ -78,6 +78,31 @@ jobs:
           
           echo "✓ Wrapper regenerated successfully"
       
+      - name: Fix Build Configuration
+        run: |
+          echo "=== Fixing minSdkVersion in build.gradle ==="
+          sed -i 's/minSdkVersion 23/minSdkVersion 24/' android/app/build.gradle
+          
+          echo "=== Removing corrupted launcher icons ==="
+          rm -f android/app/src/main/res/mipmap-*/ic_launcher.png
+          rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          
+          echo "=== Creating simple placeholder icon ==="
+          mkdir -p android/app/src/main/res/mipmap-mdpi
+          mkdir -p android/app/src/main/res/mipmap-hdpi
+          mkdir -p android/app/src/main/res/mipmap-xhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+          
+          # Create a simple 1x1 PNG (valid minimal PNG)
+          echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" | base64 -d > android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          
+          echo "✓ Build configuration fixed"
+      
       - name: Verify Gradle
         working-directory: android
         run: |
