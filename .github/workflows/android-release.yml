@@ -70,8 +70,11 @@ jobs:
           echo "=== Extracting ==="
           unzip -q gradle.zip
           
+          echo "=== Finding wrapper JAR ==="
+          find gradle-8.5 -name "*wrapper*.jar" -type f
+          
           echo "=== Copying wrapper JAR ==="
-          cp gradle-8.5/lib/gradle-wrapper-8.5.jar android/gradle/wrapper/gradle-wrapper.jar
+          find gradle-8.5 -name "*wrapper*.jar" -type f -exec cp {} android/gradle/wrapper/gradle-wrapper.jar \;
           
           echo "=== Cleaning up ==="
           rm -rf gradle-8.5 gradle.zip
