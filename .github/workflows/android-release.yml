@@ -83,6 +83,7 @@ jobs:
           else
             echo "⚠️ No keystore provided — generating one automatically."
             keytool -genkeypair \
+              -noprompt \
               -alias fungen-key-alias \
               -keyalg RSA \
               -keysize 2048 \
@@ -95,6 +96,7 @@ jobs:
             mkdir -p keystore-backup
             cp android/app/fungen-key.keystore keystore-backup/
           fi
+
 
 
       # Gradle permission
