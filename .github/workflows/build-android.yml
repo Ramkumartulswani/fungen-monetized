@@ -2,19 +2,26 @@ name: Android Release Build
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'android/**'
+      - 'src/**'
+      - 'package.json'
 
 jobs:
   build-android:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-
+    
     steps:
       # -------------------------------
       # CHECKOUT CODE
       # -------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
-
+      
       # -------------------------------
       # SETUP NODE FOR REACT NATIVE
       # -------------------------------
@@ -22,7 +29,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
-
+          cache: 'yarn'
+      
       # -------------------------------
       # SETUP JDK FOR ANDROID
       # -------------------------------
@@ -31,63 +39,167 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-
+          cache: 'gradle'
+      
       # -------------------------------
       # INSTALL DEPENDENCIES
       # -------------------------------
       - name: Install Yarn
         run: npm install -g yarn
-
+      
       - name: Install Node Modules
-        run: yarn install
-
+        run: yarn install --frozen-lockfile
+      
       # -------------------------------
       # SETUP ANDROID SDK
       # -------------------------------
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-
+      
       # -------------------------------
       # ACCEPT ANDROID LICENSES
-      # (THE FIX FOR YOUR ISSUE!)
       # -------------------------------
       - name: Accept Android Licenses
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
           yes | $ANDROID_HOME/cmdline-tools/*/bin/sdkmanager --licenses || true
-
+      
       # -------------------------------
       # SETUP KEYSTORE FOR SIGNING
       # -------------------------------
-      - name: Decode keystore
-        run: echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/fungen-key.keystore
+      - name: Setup Keystore
+        run: |
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "Using existing keystore from secrets..."
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/fungen-key.keystore
+          else
+            echo "Generating new keystore..."
+            keytool -genkeypair -v -storetype PKCS12 \
+              -keystore android/app/fungen-key.keystore \
+              -alias fungen-key-alias \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass android \
+              -keypass android \
+              -dname "CN=FunGen, OU=Development, O=FunGen, L=City, ST=State, C=US"
+            
+            echo ""
+            echo "=========================================="
+            echo "⚠️  NEW KEYSTORE GENERATED!"
+            echo "=========================================="
+            echo "For production use, you should:"
+            echo "1. Download this keystore from the artifacts"
+            echo "2. Convert it to base64 and save as ANDROID_KEYSTORE_BASE64 secret"
+            echo "3. Set KEYSTORE_PASSWORD secret to: android"
+            echo "4. Set KEY_ALIAS secret to: fungen-key-alias"
+            echo "5. Set KEY_PASSWORD secret to: android"
+            echo ""
+            echo "To convert keystore to base64, run locally:"
+            echo "base64 -w 0 fungen-key.keystore"
+            echo "=========================================="
+            
+            # Also upload the generated keystore as artifact for backup
+            mkdir -p temp-keystore
+            cp android/app/fungen-key.keystore temp-keystore/
+          fi
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-
+      
       # -------------------------------
       # GRANT EXECUTE PERMISSION
       # -------------------------------
       - name: Make gradlew executable
         run: chmod +x android/gradlew
-
+      
+      # -------------------------------
+      # VERIFY GRADLE SETUP
+      # -------------------------------
+      - name: Verify Gradle and Project
+        working-directory: android
+        run: |
+          echo "=== Gradle Version ==="
+          ./gradlew --version
+          echo ""
+          echo "=== Project Structure ==="
+          ./gradlew projects
+          echo ""
+          echo "=== Available Tasks ==="
+          ./gradlew tasks --all | grep -i bundle
+          echo ""
+          echo "=== Checking Secrets (masked) ==="
+          echo "ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && '✓ Set' || '✗ Missing' }}"
+          echo "KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD != '' && '✓ Set' || '✗ Missing' }}"
+          echo "KEY_ALIAS: ${{ secrets.KEY_ALIAS != '' && '✓ Set' || '✗ Missing' }}"
+          echo "KEY_PASSWORD: ${{ secrets.KEY_PASSWORD != '' && '✓ Set' || '✗ Missing' }}"
+      
+      # -------------------------------
+      # GRADLE CACHE (Optional but helpful)
+      # -------------------------------
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+      
       # -------------------------------
       # BUILD AAB
       # -------------------------------
       - name: Build AAB (bundleRelease)
         working-directory: android
-        run: ./gradlew bundleRelease --no-daemon --stacktrace
-
+        run: ./gradlew bundleRelease --no-daemon --stacktrace --info
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'android' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'fungen-key-alias' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'android' }}
+        continue-on-error: false
+      
       # -------------------------------
       # SHOW OUTPUT FOLDERS FOR DEBUG
       # -------------------------------
       - name: List build outputs
-        run: ls -R android/app/build/outputs
-
+        if: always()
+        run: |
+          echo "=== Checking if build directory exists ==="
+          if [ -d "android/app/build" ]; then
+            echo "Build directory found!"
+            ls -R android/app/build/outputs || echo "No outputs directory"
+          else
+            echo "Build directory not found!"
+            echo "=== Listing android/app directory ==="
+            ls -la android/app/
+          fi
+      
       # -------------------------------
       # UPLOAD ARTIFACT
       # -------------------------------
       - name: Upload AAB Artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: FunGen-AAB
+          name: FunGen-AAB-${{ github.sha }}
           path: android/app/build/outputs/bundle/release/*.aab
+          retention-days: 30
+          if-no-files-found: error
+      
+      # -------------------------------
+      # UPLOAD KEYSTORE (if newly generated)
+      # -------------------------------
+      - name: Upload Generated Keystore
+        if: success() && secrets.ANDROID_KEYSTORE_BASE64 == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: FunGen-Keystore-BACKUP
+          path: temp-keystore/fungen-key.keystore
+          retention-days: 90
+      
+      # -------------------------------
+      # CLEANUP KEYSTORE
+      # -------------------------------
+      - name: Cleanup keystore
+        if: always()
+        run: rm -f android/app/fungen-key.keystore
