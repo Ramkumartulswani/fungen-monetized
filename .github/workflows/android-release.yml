@@ -50,7 +50,7 @@ jobs:
           if [ "${{ steps.pkg-manager.outputs.manager }}" = "yarn" ]; then
             yarn install --frozen-lockfile
           else
-            npm install
+            npm ci || npm install
           fi
 
       # -------------------------------
@@ -70,18 +70,20 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Accept Android Licenses
-        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          yes | $ANDROID_HOME/cmdline-tools/*/bin/sdkmanager --licenses || true
 
       # -------------------------------
-      # KEYSTORE
+      # KEYSTORE SETUP
       # -------------------------------
       - name: Setup Keystore
         run: |
           if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
-            echo "Using keystore from secrets..."
+            echo "✓ Using keystore from secrets..."
             echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/fungen-key.keystore
           else
-            echo "Generating new keystore..."
+            echo "⚠️  No keystore found in secrets. Generating new one..."
             keytool -genkeypair -v -storetype PKCS12 \
               -keystore android/app/fungen-key.keystore \
               -alias fungen-key-alias \
@@ -89,7 +91,24 @@ jobs:
               -keysize 2048 \
               -validity 10000 \
               -storepass android \
-              -keypass android
+              -keypass android \
+              -dname "CN=FunGen, OU=Development, O=FunGen, L=City, ST=State, C=US"
+            
+            echo ""
+            echo "=========================================="
+            echo "⚠️  NEW KEYSTORE GENERATED!"
+            echo "=========================================="
+            echo "Credentials for this build:"
+            echo "  KEYSTORE_PASSWORD: android"
+            echo "  KEY_ALIAS: fungen-key-alias"
+            echo "  KEY_PASSWORD: android"
+            echo ""
+            echo "IMPORTANT: Save the generated keystore from artifacts!"
+            echo "=========================================="
+            
+            # Save for artifact upload
+            mkdir -p keystore-backup
+            cp android/app/fungen-key.keystore keystore-backup/
           fi
 
       # -------------------------------
@@ -97,6 +116,18 @@ jobs:
       # -------------------------------
       - name: Make gradlew executable
         run: chmod +x android/gradlew
+
+      # -------------------------------
+      # VERIFY GRADLE SETUP
+      # -------------------------------
+      - name: Verify Gradle Setup
+        working-directory: android
+        run: |
+          echo "=== Gradle Version ==="
+          ./gradlew --version
+          echo ""
+          echo "=== Checking for bundleRelease task ==="
+          ./gradlew tasks --all | grep -i bundle || echo "No bundle tasks found"
 
       # -------------------------------
       # BUILD AAB
@@ -115,20 +146,48 @@ jobs:
       - name: List Build Outputs
         if: always()
         run: |
-          echo "Checking android/app/build..."
-          if [ -d "android/app/build" ]; then
+          echo "=== Checking build outputs ==="
+          if [ -d "android/app/build/outputs" ]; then
+            echo "✓ Build outputs found!"
             ls -R android/app/build/outputs
           else
-            echo "❌ Build folder not found!"
-            ls -la android/app
+            echo "❌ Build outputs not found!"
+            echo ""
+            echo "=== Checking build directory ==="
+            if [ -d "android/app/build" ]; then
+              ls -la android/app/build/
+            else
+              echo "❌ Build directory doesn't exist!"
+              ls -la android/app/
+            fi
           fi
 
       # -------------------------------
       # UPLOAD AAB
       # -------------------------------
       - name: Upload AAB Artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: FunGen-AAB-${{ github.sha }}
           path: android/app/build/outputs/bundle/release/*.aab
+          retention-days: 30
           if-no-files-found: error
+
+      # -------------------------------
+      # UPLOAD KEYSTORE (if generated)
+      # -------------------------------
+      - name: Upload Generated Keystore
+        if: success() && hashFiles('keystore-backup/fungen-key.keystore') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: FunGen-Keystore-BACKUP-${{ github.sha }}
+          path: keystore-backup/fungen-key.keystore
+          retention-days: 90
+
+      # -------------------------------
+      # CLEANUP
+      # -------------------------------
+      - name: Cleanup Keystore
+        if: always()
+        run: rm -f android/app/fungen-key.keystore keystore-backup/fungen-key.keystore
