@@ -16,23 +16,14 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      # -------------------------------
-      # CHECKOUT CODE
-      # -------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # -------------------------------
-      # SETUP NODE
-      # -------------------------------
       - name: Setup Node.js 18
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      # -------------------------------
-      # DETECT PACKAGE MANAGER
-      # -------------------------------
       - name: Detect Package Manager
         id: pkg-manager
         run: |
@@ -42,9 +33,6 @@ jobs:
             echo "manager=npm" >> $GITHUB_OUTPUT
           fi
 
-      # -------------------------------
-      # INSTALL DEPENDENCIES
-      # -------------------------------
       - name: Install Dependencies
         run: |
           if [ "${{ steps.pkg-manager.outputs.manager }}" = "yarn" ]; then
@@ -53,9 +41,6 @@ jobs:
             npm ci || npm install
           fi
 
-      # -------------------------------
-      # SETUP JAVA
-      # -------------------------------
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
@@ -64,28 +49,28 @@ jobs:
           cache: 'gradle'
 
       # -------------------------------
-      # SETUP ANDROID SDK
+      # FIXED ANDROID SDK BLOCK
       # -------------------------------
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
           accept-android-sdk-licenses: false
-
+          packages: |
+            platform-tools
+            build-tools;34.0.0
+            platforms;android-34
 
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses --sdk_root=$ANDROID_HOME
 
-
       # -------------------------------
-      # KEYSTORE SETUP
+      # KEYSTORE
       # -------------------------------
       - name: Setup Keystore
         run: |
           if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
-            echo "✓ Using keystore from secrets..."
             echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/fungen-key.keystore
           else
-            echo "⚠️  No keystore found in secrets. Generating new one..."
             keytool -genkeypair -v -storetype PKCS12 \
               -keystore android/app/fungen-key.keystore \
               -alias fungen-key-alias \
@@ -93,47 +78,18 @@ jobs:
               -keysize 2048 \
               -validity 10000 \
               -storepass android \
-              -keypass android \
-              -dname "CN=FunGen, OU=Development, O=FunGen, L=City, ST=State, C=US"
-            
-            echo ""
-            echo "=========================================="
-            echo "⚠️  NEW KEYSTORE GENERATED!"
-            echo "=========================================="
-            echo "Credentials for this build:"
-            echo "  KEYSTORE_PASSWORD: android"
-            echo "  KEY_ALIAS: fungen-key-alias"
-            echo "  KEY_PASSWORD: android"
-            echo ""
-            echo "IMPORTANT: Save the generated keystore from artifacts!"
-            echo "=========================================="
-            
-            # Save for artifact upload
+              -keypass android
             mkdir -p keystore-backup
             cp android/app/fungen-key.keystore keystore-backup/
           fi
 
-      # -------------------------------
-      # GRANT EXECUTE PERMISSION
-      # -------------------------------
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      # -------------------------------
-      # VERIFY GRADLE SETUP
-      # -------------------------------
       - name: Verify Gradle Setup
         working-directory: android
-        run: |
-          echo "=== Gradle Version ==="
-          ./gradlew --version
-          echo ""
-          echo "=== Checking for bundleRelease task ==="
-          ./gradlew tasks --all | grep -i bundle || echo "No bundle tasks found"
+        run: ./gradlew --version
 
-      # -------------------------------
-      # BUILD AAB
-      # -------------------------------
       - name: Build AAB
         working-directory: android
         run: ./gradlew bundleRelease --stacktrace --info
@@ -142,31 +98,12 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'fungen-key-alias' }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'android' }}
 
-      # -------------------------------
-      # DEBUG OUTPUT
-      # -------------------------------
       - name: List Build Outputs
         if: always()
         run: |
           echo "=== Checking build outputs ==="
-          if [ -d "android/app/build/outputs" ]; then
-            echo "✓ Build outputs found!"
-            ls -R android/app/build/outputs
-          else
-            echo "❌ Build outputs not found!"
-            echo ""
-            echo "=== Checking build directory ==="
-            if [ -d "android/app/build" ]; then
-              ls -la android/app/build/
-            else
-              echo "❌ Build directory doesn't exist!"
-              ls -la android/app/
-            fi
-          fi
+          ls -R android/app/build/outputs || echo "❌ No outputs found"
 
-      # -------------------------------
-      # UPLOAD AAB
-      # -------------------------------
       - name: Upload AAB Artifact
         if: success()
         uses: actions/upload-artifact@v4
@@ -176,9 +113,6 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-      # -------------------------------
-      # UPLOAD KEYSTORE (if generated)
-      # -------------------------------
       - name: Upload Generated Keystore
         if: success() && hashFiles('keystore-backup/fungen-key.keystore') != ''
         uses: actions/upload-artifact@v4
@@ -187,9 +121,6 @@ jobs:
           path: keystore-backup/fungen-key.keystore
           retention-days: 90
 
-      # -------------------------------
-      # CLEANUP
-      # -------------------------------
       - name: Cleanup Keystore
         if: always()
         run: rm -f android/app/fungen-key.keystore keystore-backup/fungen-key.keystore
