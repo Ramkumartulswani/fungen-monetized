@@ -58,45 +58,41 @@ jobs:
       
       - name: Fix Gradle Wrapper
         run: |
-          echo "=== Using Gradle 9.2.1 ==="
+          echo "=== Using Gradle 8.5 (more stable than 9.2.1) ==="
           
-          echo "=== Removing corrupt wrapper JAR ==="
-          rm -f android/gradle/wrapper/gradle-wrapper.jar
+          echo "=== Removing old wrapper files ==="
+          rm -rf android/gradle/wrapper/*
+          mkdir -p android/gradle/wrapper
           
-          echo "=== Downloading Gradle 9.2.1 distribution ==="
-          curl -L "https://services.gradle.org/distributions/gradle-9.2.1-bin.zip" -o gradle-temp.zip
+          echo "=== Downloading Gradle 8.5 distribution ==="
+          curl -L "https://services.gradle.org/distributions/gradle-8.5-bin.zip" -o gradle.zip
           
-          echo "=== Listing contents to find wrapper JAR ==="
-          unzip -l gradle-temp.zip | grep -i wrapper || true
+          echo "=== Extracting ==="
+          unzip -q gradle.zip
           
-          echo "=== Extracting wrapper JAR ==="
-          unzip -j gradle-temp.zip "gradle-9.2.1/lib/gradle-wrapper-*.jar" -d android/gradle/wrapper/ || {
-            echo "Trying alternative path..."
-            unzip -j gradle-temp.zip "*/lib/plugins/gradle-wrapper-*.jar" -d android/gradle/wrapper/
-          }
+          echo "=== Copying wrapper JAR ==="
+          cp gradle-8.5/lib/gradle-wrapper-8.5.jar android/gradle/wrapper/gradle-wrapper.jar
           
-          cd android/gradle/wrapper
-          
-          echo "=== Renaming wrapper JAR ==="
-          mv gradle-wrapper-*.jar gradle-wrapper.jar 2>/dev/null || echo "Already named correctly"
+          echo "=== Cleaning up ==="
+          rm -rf gradle-8.5 gradle.zip
           
           echo "=== Verifying wrapper JAR ==="
-          ls -lh gradle-wrapper.jar
+          ls -lh android/gradle/wrapper/gradle-wrapper.jar
+          file android/gradle/wrapper/gradle-wrapper.jar
           
           echo "=== Creating gradle-wrapper.properties ==="
-          echo "distributionBase=GRADLE_USER_HOME" > gradle-wrapper.properties
-          echo "distributionPath=wrapper/dists" >> gradle-wrapper.properties
-          echo "distributionUrl=https\://services.gradle.org/distributions/gradle-9.2.1-all.zip" >> gradle-wrapper.properties
-          echo "networkTimeout=10000" >> gradle-wrapper.properties
-          echo "validateDistributionUrl=true" >> gradle-wrapper.properties
-          echo "zipStoreBase=GRADLE_USER_HOME" >> gradle-wrapper.properties
-          echo "zipStorePath=wrapper/dists" >> gradle-wrapper.properties
+          cat > android/gradle/wrapper/gradle-wrapper.properties << 'PROPS'
+distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-all.zip
+networkTimeout=10000
+validateDistributionUrl=true
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+PROPS
           
-          echo "✓ gradle-wrapper.properties configured"
-          cat gradle-wrapper.properties
-          
-          cd ../../..
-          rm -f gradle-temp.zip
+          echo "✓ Wrapper configured"
+          cat android/gradle/wrapper/gradle-wrapper.properties
       
       - name: Verify Gradle
         working-directory: android
