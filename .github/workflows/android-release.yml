@@ -31,7 +31,7 @@ jobs:
           node-version: 18
 
       - name: Install JS dependencies
-        run: npm install
+        run: npm ci || npm install
 
       # ---------------------------------------------------------
       # JAVA
@@ -44,25 +44,15 @@ jobs:
           cache: gradle
 
       # ---------------------------------------------------------
-      # MANUAL ANDROID SDK INSTALLATION (SAFE & STABLE)
+      # ANDROID SDK (using action - simpler!)
       # ---------------------------------------------------------
-      - name: Install Android SDK manually
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android Licenses
         run: |
-          sudo mkdir -p /usr/local/android-sdk
-          sudo chown $USER:$USER /usr/local/android-sdk
-
-          echo "⬇️ Downloading Android Command Line Tools..."
-          wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline.zip
-          unzip -q cmdline.zip -d /usr/local/android-sdk/cmdline-tools
-          mv /usr/local/android-sdk/cmdline-tools/cmdline-tools /usr/local/android-sdk/cmdline-tools/latest
-
-          export ANDROID_HOME=/usr/local/android-sdk
-          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
-
-          yes | sdkmanager --licenses
-          yes | sdkmanager "platform-tools"
-          yes | sdkmanager "platforms;android-34"
-          yes | sdkmanager "build-tools;34.0.0"
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          yes | $ANDROID_HOME/cmdline-tools/*/bin/sdkmanager --licenses || true
 
       # ---------------------------------------------------------
       # KEYSTORE
@@ -80,8 +70,7 @@ jobs:
             echo "✓ Using keystore from secrets"
             echo "$KEYSTORE_B64" | base64 --decode > android/app/fungen-key.keystore
           else
-            echo "⚠️ No keystore found — generating new keystore..."
-
+            echo "⚠️ Generating new keystore..."
             keytool -genkeypair \
               -alias "$KEY_ALIAS" \
               -keyalg RSA \
@@ -94,47 +83,143 @@ jobs:
               -dname "CN=FunGen, OU=Mobile, O=FunGen Apps, L=Mumbai, ST=Maharashtra, C=IN" \
               -noprompt
 
-            echo "✔ Generated default keystore"
+            mkdir -p keystore-backup
+            cp android/app/fungen-key.keystore keystore-backup/
+            echo "✔ Keystore generated and backed up"
+          fi
+
+          # Verify keystore exists
+          if [ -f "android/app/fungen-key.keystore" ]; then
+            echo "✓ Keystore verified at android/app/fungen-key.keystore"
+            ls -lh android/app/fungen-key.keystore
+          else
+            echo "❌ Keystore not found!"
+            exit 1
           fi
 
       # ---------------------------------------------------------
-      # FIX BROKEN GRADLE WRAPPER → INSTALL GRADLE 9.2.1 WRAPPER
+      # FIX gradlew JVM options
       # ---------------------------------------------------------
-      - name: Replace Gradle Wrapper JAR with 9.2.1
+      - name: Fix gradlew JVM options
         run: |
-          echo "🧹 Removing old wrapper JARs..."
-          find android/gradle/wrapper -name "gradle-wrapper.jar" -delete || true
+          echo "=== Checking current gradlew DEFAULT_JVM_OPTS ==="
+          grep "DEFAULT_JVM_OPTS" android/gradlew || echo "Not found"
+          
+          # Use Python to fix the line (more reliable than sed/awk)
+          python3 << 'PYTHON_SCRIPT'
+import re
 
-          echo "⬇️ Downloading Gradle 9.2.1..."
-          curl -L "https://services.gradle.org/distributions/gradle-9.2.1-all.zip" -o gradle.zip
+with open('android/gradlew', 'r') as f:
+    content = f.read()
 
-          echo "📦 Extracting wrapper jar..."
-          unzip -j gradle.zip "gradle-9.2.1/lib/plugins/gradle-wrapper-9.2.1.jar" -d android/gradle/wrapper/
+# Replace the problematic DEFAULT_JVM_OPTS line
+content = re.sub(
+    r"DEFAULT_JVM_OPTS=.*",
+    'DEFAULT_JVM_OPTS="-Xmx512m -Xms256m"',
+    content
+)
 
-          mv android/gradle/wrapper/gradle-wrapper-9.2.1.jar android/gradle/wrapper/gradle-wrapper.jar
+with open('android/gradlew', 'w') as f:
+    f.write(content)
 
-          echo "🔎 Final wrapper file:"
-          ls -l android/gradle/wrapper/gradle-wrapper.jar
+print("✓ Fixed gradlew DEFAULT_JVM_OPTS")
+PYTHON_SCRIPT
+          
+          echo "=== New DEFAULT_JVM_OPTS ==="
+          grep "DEFAULT_JVM_OPTS" android/gradlew
 
-      # ---------------------------------------------------------
-      # FIX gradlew (MAKE EXECUTABLE & VALID)
-      # ---------------------------------------------------------
-      - name: Fix gradlew permissions
+      - name: Make gradlew executable
         run: chmod +x android/gradlew
 
       # ---------------------------------------------------------
-      # BUILD
+      # GRADLE PROPERTIES FOR CI
+      # ---------------------------------------------------------
+      - name: Configure gradle.properties
+        run: |
+          cat > android/gradle.properties << 'EOF'
+# CI-optimized settings
+org.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=512m
+org.gradle.daemon=false
+org.gradle.parallel=true
+
+# Android
+android.useAndroidX=true
+android.enableJetifier=true
+
+# Kotlin
+kotlin.code.style=official
+EOF
+          
+          echo "✓ gradle.properties configured for CI"
+
+      # ---------------------------------------------------------
+      # VERIFY SETUP
+      # ---------------------------------------------------------
+      - name: Verify Gradle Setup
+        working-directory: android
+        run: |
+          echo "=== Gradle Version ==="
+          ./gradlew --version
+          echo ""
+          echo "=== Available bundle tasks ==="
+          ./gradlew tasks --all | grep -i bundle || echo "No bundle tasks found"
+
+      # ---------------------------------------------------------
+      # BUILD AAB
       # ---------------------------------------------------------
       - name: Build Android AAB
         working-directory: android
-        run: ./gradlew bundleRelease --stacktrace --info
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'Fungen@2025' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'fungen-key-alias' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'Fungen@2025' }}
+        run: |
+          echo "=== Building AAB ==="
+          ./gradlew bundleRelease --stacktrace --info --no-daemon
 
       # ---------------------------------------------------------
-      # ARTIFACT UPLOAD
+      # DEBUG OUTPUT
+      # ---------------------------------------------------------
+      - name: List Build Outputs
+        if: always()
+        run: |
+          echo "=== Searching for AAB files ==="
+          find android -name "*.aab" || echo "No AAB found"
+          echo ""
+          if [ -d "android/app/build/outputs" ]; then
+            echo "=== Build outputs ==="
+            ls -R android/app/build/outputs
+          else
+            echo "❌ No build/outputs directory"
+          fi
+
+      # ---------------------------------------------------------
+      # UPLOAD AAB
       # ---------------------------------------------------------
       - name: Upload AAB Artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: FunGen-AAB
+          name: FunGen-AAB-${{ github.sha }}
           path: android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
+          retention-days: 30
+
+      # ---------------------------------------------------------
+      # UPLOAD KEYSTORE BACKUP (if generated)
+      # ---------------------------------------------------------
+      - name: Upload Keystore Backup
+        if: success() && hashFiles('keystore-backup/fungen-key.keystore') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: FunGen-Keystore-BACKUP-${{ github.sha }}
+          path: keystore-backup/fungen-key.keystore
+          if-no-files-found: ignore
+          retention-days: 90
+
+      # ---------------------------------------------------------
+      # CLEANUP
+      # ---------------------------------------------------------
+      - name: Cleanup
+        if: always()
+        run: rm -f android/app/fungen-key.keystore
