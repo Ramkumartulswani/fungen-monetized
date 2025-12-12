@@ -3,15 +3,23 @@ pluginManagement {
         gradlePluginPortal()
         google()
         mavenCentral()
-        maven { url("$rootDir/../node_modules/react-native/android") }   // REQUIRED
+
+        // React Native plugin repo fallbacks
+        maven { url("$rootDir/../node_modules/react-native/android") }
+        maven { url("$rootDir/../../node_modules/react-native/android") }
+        maven { url("$rootDir/../../../node_modules/react-native/android") }
     }
 }
 
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
     repositories {
         google()
         mavenCentral()
-        maven { url("$rootDir/../node_modules/react-native/android") }   // REQUIRED
+
+        // React Native plugin repo fallbacks
+        maven { url("$rootDir/../node_modules/react-native/android") }
+        maven { url("$rootDir/../../node_modules/react-native/android") }
+        maven { url("$rootDir/../../../node_modules/react-native/android") }
     }
 }
