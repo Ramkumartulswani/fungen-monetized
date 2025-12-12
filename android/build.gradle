@@ -2,16 +2,12 @@ buildscript {
     repositories {
         google()
         mavenCentral()
+        maven { url("$rootDir/../node_modules/react-native/android") }   // REQUIRED
     }
     dependencies {
-        // AGP version compatible with Gradle 8.x (use 8.1.1 or appropriate)
         classpath("com.android.tools.build:gradle:8.1.1")
-
-        // Kotlin Gradle plugin (match your kotlinVersion)
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.10")
-
-        // React Native Gradle plugin (provides com.facebook.react plugin)
-        classpath("com.facebook.react:react-native-gradle-plugin")
+        classpath("com.facebook.react:react-native-gradle-plugin")       // MUST MATCH REPO ABOVE
     }
 }
 
@@ -20,5 +16,6 @@ allprojects {
         mavenLocal()
         mavenCentral()
         google()
+        maven { url("$rootDir/../node_modules/react-native/android") }   // REQUIRED
     }
 }
