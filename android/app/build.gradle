@@ -1,5 +1,12 @@
 apply plugin: "com.android.application"
+apply plugin: "com.facebook.react"
 apply plugin: "kotlin-android"
+
+import com.android.build.OutputFile
+
+project.ext.react = [
+    enableHermes: true
+]
 
 android {
     namespace "com.ramkumar.fungen"
@@ -7,7 +14,7 @@ android {
 
     defaultConfig {
         applicationId "com.ramkumar.fungen"
-        minSdkVersion 23
+        minSdkVersion 24         // You already modified this in workflow
         targetSdkVersion 34
         versionCode 1
         versionName "1.0"
@@ -15,12 +22,10 @@ android {
 
     signingConfigs {
         release {
-            if (System.getenv("KEYSTORE_PASSWORD")) {
-                storeFile file("fungen-key.keystore")
-                storePassword System.getenv("KEYSTORE_PASSWORD")
-                keyAlias System.getenv("KEY_ALIAS")
-                keyPassword System.getenv("KEY_PASSWORD")
-            }
+            storeFile file("fungen-key.keystore")
+            storePassword System.getenv("KEYSTORE_PASSWORD") ?: "Fungen@2025"
+            keyAlias System.getenv("KEY_ALIAS") ?: "fungen-key-alias"
+            keyPassword System.getenv("KEY_PASSWORD") ?: "Fungen@2025"
         }
     }
 
@@ -31,10 +36,17 @@ android {
             shrinkResources false
         }
     }
+
+    packagingOptions {
+        pickFirst "**/*.so"
+        pickFirst "**/libc++_shared.so"
+    }
 }
 
 dependencies {
-    implementation 'androidx.core:core-ktx:1.12.0'
-    implementation 'com.facebook.react:react-android:+'
-    implementation "org.jetbrains.kotlin:kotlin-stdlib:${kotlinVersion}"
+    implementation "com.facebook.react:react-android:+"
+    implementation platform("com.facebook.react:react-android-bom:+")
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"
 }
+
+apply from: "../../node_modules/react-native/react.gradle"
