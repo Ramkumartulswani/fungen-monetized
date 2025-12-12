@@ -7,32 +7,44 @@ jobs:
   build-android:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 18
-      
+
       - name: Install dependencies
         run: npm ci || npm install
-      
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
           cache: gradle
-      
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-      
-      - name: Accept licenses
-        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-      
+
+      # ----------------------------------------
+      # NEW: REQUIRED FIX FOR UBUNTU 24 RUNNERS
+      # ----------------------------------------
+      - name: Accept ALL Android Licenses (Ubuntu 24 Fix)
+        run: |
+          yes | sudo /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      - name: Install Required Android SDK Packages
+        run: |
+          sudo /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager \
+            "platform-tools" \
+            "platforms;android-34" \
+            "build-tools;34.0.0" || true
+      # ----------------------------------------
+
       - name: Setup keystore
         run: |
           keytool -genkeypair -v -storetype PKCS12 \
@@ -41,103 +53,42 @@ jobs:
             -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass Fungen@2025 -keypass Fungen@2025 \
             -dname "CN=FunGen, OU=Mobile, O=FunGen, L=Mumbai, ST=MH, C=IN"
-          
+
           echo "✓ Keystore created"
           ls -lh android/app/fungen-key.keystore
-      
+
       - name: Fix gradlew
         run: |
-          echo "=== Current DEFAULT_JVM_OPTS ==="
-          grep DEFAULT_JVM_OPTS android/gradlew || true
-          
-          sed -i 's/DEFAULT_JVM_OPTS=.*/DEFAULT_JVM_OPTS="-Xmx512m -Xms256m"/' android/gradlew
+          echo "=== Updating JVM options ==="
+          sed -i 's/DEFAULT_JVM_OPTS=.*/DEFAULT_JVM_OPTS="-Xmx1024m -Xms512m"/' android/gradlew
           chmod +x android/gradlew
-          
-          echo "=== Fixed DEFAULT_JVM_OPTS ==="
-          grep DEFAULT_JVM_OPTS android/gradlew
-      
-      - name: Fix Gradle Wrapper  
+
+      - name: Fix Gradle Wrapper
         run: |
           echo "=== Regenerating Gradle wrapper from scratch ==="
-          
           cd android
-          
-          echo "=== Installing Gradle 8.5 temporarily ==="
           wget -q https://services.gradle.org/distributions/gradle-8.5-bin.zip
           unzip -q gradle-8.5-bin.zip
-          
-          echo "=== Using Gradle to generate proper wrapper ==="
           ./gradle-8.5/bin/gradle wrapper --gradle-version 8.5 --distribution-type all
-          
-          echo "=== Cleaning up temporary Gradle ==="
           rm -rf gradle-8.5 gradle-8.5-bin.zip
-          
-          echo "=== Verifying wrapper files ==="
-          ls -lh gradle/wrapper/
-          cat gradle/wrapper/gradle-wrapper.properties
-          
           echo "✓ Wrapper regenerated successfully"
-      
+
       - name: Fix Build Configuration
         run: |
-          echo "=== Fixing minSdkVersion in build.gradle ==="
+          echo "=== Fixing minSdkVersion ==="
           sed -i 's/minSdkVersion 23/minSdkVersion 24/' android/app/build.gradle
-          
-          echo "=== Removing corrupted launcher icons ==="
-          rm -f android/app/src/main/res/mipmap-*/ic_launcher.png
-          rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
-          
-          echo "=== Creating simple placeholder icon ==="
+
+          echo "=== Ensuring launcher icons exist ==="
           mkdir -p android/app/src/main/res/mipmap-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}
-          
           echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" | base64 -d > android/app/src/main/res/mipmap-mdpi/ic_launcher.png
           for dir in hdpi xhdpi xxhdpi xxxhdpi; do
             cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-$dir/ic_launcher.png
           done
-          
-          echo "=== Creating PackageList.java using echo ==="
-          mkdir -p android/app/src/main/java/com/facebook/react
-          
-          echo "package com.facebook.react;" > android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "import android.app.Application;" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "import android.content.Context;" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "import java.util.ArrayList;" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "import java.util.Arrays;" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "import java.util.List;" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "import com.facebook.react.ReactPackage;" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "public class PackageList {" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "  private Application application;" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "  private ReactNativeHost reactNativeHost;" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "  public PackageList(ReactNativeHost reactNativeHost) {" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "    this.reactNativeHost = reactNativeHost;" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "    this.application = (Application) reactNativeHost.getApplication();" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "  }" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "  public PackageList(Application application) {" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "    this.application = application;" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "  }" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "  public ArrayList<ReactPackage> getPackages() {" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "    return new ArrayList<>(Arrays.asList(" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "      new com.facebook.react.shell.MainReactPackage()" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "    ));" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "  }" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          echo "}" >> android/app/src/main/java/com/facebook/react/PackageList.java
-          
-          echo "=== Verifying PackageList.java ==="
-          cat android/app/src/main/java/com/facebook/react/PackageList.java
-          
-          echo "✓ Build configuration fixed"
-      
+
       - name: Verify Gradle
         working-directory: android
-        run: |
-          echo "=== Gradle Version ==="
-          ./gradlew --version
-      
+        run: ./gradlew --version
+
       - name: Build AAB
         working-directory: android
         env:
@@ -145,18 +96,18 @@ jobs:
           KEY_ALIAS: fungen-key-alias
           KEY_PASSWORD: Fungen@2025
         run: ./gradlew bundleRelease --stacktrace --no-daemon
-      
+
       - name: List outputs
         if: always()
         run: |
           echo "=== Searching for AAB ==="
           find android -name "*.aab" || echo "No AAB found"
-          
+
           if [ -d "android/app/build/outputs" ]; then
             echo "=== Build outputs ==="
             ls -R android/app/build/outputs
           fi
-      
+
       - name: Upload AAB
         if: success()
         uses: actions/upload-artifact@v4
