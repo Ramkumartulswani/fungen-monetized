@@ -101,6 +101,7 @@ jobs:
           echo "package com.facebook.react;" > android/app/src/main/java/com/facebook/react/PackageList.java
           echo "" >> android/app/src/main/java/com/facebook/react/PackageList.java
           echo "import android.app.Application;" >> android/app/src/main/java/com/facebook/react/PackageList.java
+          echo "import android.content.Context;" >> android/app/src/main/java/com/facebook/react/PackageList.java
           echo "import java.util.ArrayList;" >> android/app/src/main/java/com/facebook/react/PackageList.java
           echo "import java.util.Arrays;" >> android/app/src/main/java/com/facebook/react/PackageList.java
           echo "import java.util.List;" >> android/app/src/main/java/com/facebook/react/PackageList.java
@@ -108,6 +109,12 @@ jobs:
           echo "" >> android/app/src/main/java/com/facebook/react/PackageList.java
           echo "public class PackageList {" >> android/app/src/main/java/com/facebook/react/PackageList.java
           echo "  private Application application;" >> android/app/src/main/java/com/facebook/react/PackageList.java
+          echo "  private ReactNativeHost reactNativeHost;" >> android/app/src/main/java/com/facebook/react/PackageList.java
+          echo "" >> android/app/src/main/java/com/facebook/react/PackageList.java
+          echo "  public PackageList(ReactNativeHost reactNativeHost) {" >> android/app/src/main/java/com/facebook/react/PackageList.java
+          echo "    this.reactNativeHost = reactNativeHost;" >> android/app/src/main/java/com/facebook/react/PackageList.java
+          echo "    this.application = (Application) reactNativeHost.getApplication();" >> android/app/src/main/java/com/facebook/react/PackageList.java
+          echo "  }" >> android/app/src/main/java/com/facebook/react/PackageList.java
           echo "" >> android/app/src/main/java/com/facebook/react/PackageList.java
           echo "  public PackageList(Application application) {" >> android/app/src/main/java/com/facebook/react/PackageList.java
           echo "    this.application = application;" >> android/app/src/main/java/com/facebook/react/PackageList.java
