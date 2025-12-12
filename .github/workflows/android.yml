@@ -1,10 +1,10 @@
-name: Android Release Build
+name: Android Build (APK + AAB)
 
 on:
   workflow_dispatch:
 
 jobs:
-  build:
+  android-build:
     runs-on: ubuntu-latest
 
     steps:
@@ -16,11 +16,11 @@ jobs:
         with:
           node-version: 18
 
-      - name: Install JS dependencies
+      - name: Install JS Dependencies
         working-directory: FunGenNew
         run: npm install
 
-      - name: Setup Java 17 (required for AGP 8.x)
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -30,21 +30,20 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # ------- Ubuntu 24 FIX: Accept All SDK Licenses -------
+      # ---- Ubuntu 24 FIX ----
       - name: Accept Android Licenses
         run: |
           yes | sudo /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Install Required Android SDK Packages
+      - name: Install Required SDK Packages
         run: |
           sudo /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager \
             "platform-tools" \
             "platforms;android-34" \
             "build-tools;34.0.0" || true
-      # ------------------------------------------------------
+      # ------------------------
 
-      # ------- Generate Clean Keystore for Testing -------
-      - name: Create Debug Keystore (for testing release build)
+      - name: Generate Release Keystore (temporary)
         run: |
           keytool -genkeypair -v \
             -storetype PKCS12 \
@@ -56,21 +55,32 @@ jobs:
             -storepass 123456 \
             -keypass 123456 \
             -dname "CN=FunGenNew, OU=Dev, O=FunGen, L=Mumbai, ST=MH, C=IN"
-      # ---------------------------------------------------
 
-      - name: Build Android AAB
+      - name: Build APK + AAB
         working-directory: FunGenNew/android
         env:
           KEYSTORE_PASSWORD: 123456
           KEY_ALIAS: fungentest
           KEY_PASSWORD: 123456
-        run: ./gradlew bundleRelease --stacktrace --no-daemon
+        run: |
+          ./gradlew assembleRelease --stacktrace --no-daemon
+          ./gradlew bundleRelease --stacktrace --no-daemon
 
-      - name: List Outputs
+      - name: List Build Outputs
         if: always()
         run: |
-          find FunGenNew/android/app -name "*.aab" || echo "No AAB found"
-          ls -R FunGenNew/android/app/build/outputs || true
+          echo "=== APK Files ==="
+          find FunGenNew/android/app -name "*.apk" || true
+          
+          echo "=== AAB Files ==="
+          find FunGenNew/android/app -name "*.aab" || true
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: FunGenNew-APK
+          path: FunGenNew/android/app/build/outputs/apk/release/*.apk
+          retention-days: 30
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
