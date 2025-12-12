@@ -3,12 +3,15 @@ pluginManagement {
         gradlePluginPortal()
         google()
         mavenCentral()
+        maven { url("$rootDir/../node_modules/react-native/android") }   // REQUIRED
     }
 }
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
         mavenCentral()
+        maven { url("$rootDir/../node_modules/react-native/android") }   // REQUIRED
     }
 }
