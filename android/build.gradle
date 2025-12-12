@@ -5,10 +5,7 @@ buildscript {
 
         // Required for React Native Gradle Plugin
         maven { url("$rootDir/../node_modules/react-native/android") }
-        maven { url("$rootDir/../../node_modules/react-native/android") }
-        maven { url("$rootDir/../../../node_modules/react-native/android") }
     }
-
     dependencies {
         classpath("com.android.tools.build:gradle:8.1.1")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.10")
@@ -18,13 +15,11 @@ buildscript {
 
 allprojects {
     repositories {
-        mavenLocal()
-        mavenCentral()
         google()
+        mavenCentral()
+        mavenLocal()
 
-        // Add same multi-level fallbacks
+        // Required plugin repository
         maven { url("$rootDir/../node_modules/react-native/android") }
-        maven { url("$rootDir/../../node_modules/react-native/android") }
-        maven { url("$rootDir/../../../node_modules/react-native/android") }
     }
 }
