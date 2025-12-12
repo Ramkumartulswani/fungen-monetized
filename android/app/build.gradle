@@ -2,7 +2,7 @@ apply plugin: "com.android.application"
 apply plugin: "com.facebook.react"
 apply plugin: "kotlin-android"
 
-import com.android.build.OutputFile
+def kotlinVersion = "1.9.10"
 
 project.ext.react = [
     enableHermes: true
@@ -10,12 +10,12 @@ project.ext.react = [
 
 android {
     namespace "com.ramkumar.fungen"
-    compileSdkVersion 34
+    compileSdk 34
 
     defaultConfig {
         applicationId "com.ramkumar.fungen"
-        minSdkVersion 24         // You already modified this in workflow
-        targetSdkVersion 34
+        minSdkVersion 24
+        targetSdkVersion 34   // ← FIXED!
         versionCode 1
         versionName "1.0"
     }
