@@ -88,20 +88,18 @@ jobs:
           rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
           
           echo "=== Creating simple placeholder icon ==="
-          mkdir -p android/app/src/main/res/mipmap-mdpi
+          mkdir -p android/app/src/main/res/mipmap-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}
           
-          # Create a simple 1x1 PNG (valid minimal PNG)
           echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" | base64 -d > android/app/src/main/res/mipmap-mdpi/ic_launcher.png
-          cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png 2>/dev/null || mkdir -p android/app/src/main/res/mipmap-hdpi && cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png
-          cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-xhdpi/ic_launcher.png 2>/dev/null || mkdir -p android/app/src/main/res/mipmap-xhdpi && cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
-          cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png 2>/dev/null || mkdir -p android/app/src/main/res/mipmap-xxhdpi && cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
-          cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png 2>/dev/null || mkdir -p android/app/src/main/res/mipmap-xxxhdpi && cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          for dir in hdpi xhdpi xxhdpi xxxhdpi; do
+            cp android/app/src/main/res/mipmap-mdpi/ic_launcher.png android/app/src/main/res/mipmap-$dir/ic_launcher.png
+          done
           
-          echo "=== Creating PackageList.java manually ==="
+          echo "=== Creating PackageList.java using Python ==="
           mkdir -p android/app/src/main/java/com/facebook/react
           
-          cat > /tmp/PackageList.java << 'PKGLIST'
-package com.facebook.react;
+          python3 << 'PYSCRIPT'
+content = """package com.facebook.react;
 
 import android.app.Application;
 import java.util.ArrayList;
@@ -122,12 +120,15 @@ public class PackageList {
     ));
   }
 }
-PKGLIST
+"""
+
+with open('android/app/src/main/java/com/facebook/react/PackageList.java', 'w') as f:
+    f.write(content)
+
+print("✓ PackageList.java created")
+PYSCRIPT
           
-          cp /tmp/PackageList.java android/app/src/main/java/com/facebook/react/PackageList.java
-          
-          echo "=== Verifying PackageList.java was created ==="
-          ls -la android/app/src/main/java/com/facebook/react/
+          echo "=== Verifying PackageList.java ==="
           cat android/app/src/main/java/com/facebook/react/PackageList.java
           
           echo "✓ Build configuration fixed"
