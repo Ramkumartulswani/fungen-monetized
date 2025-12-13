@@ -76,7 +76,7 @@ android {
 
     namespace "com.fungennew"
     defaultConfig {
-        applicationId "com.fungennew"
+        applicationId "com.fungennew.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
