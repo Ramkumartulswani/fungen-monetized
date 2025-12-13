@@ -18,7 +18,7 @@ jobs:
 
       - name: Install JS dependencies
         working-directory: FunGenNew
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
@@ -27,21 +27,22 @@ jobs:
           java-version: 17
           cache: gradle
 
+      # ✅ Install Android SDK (NO packages here)
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # ✅ CRITICAL FIX: Install SDK + accept licenses NON-INTERACTIVE
-      - name: Install Android SDK packages (non-interactive)
+      # ✅ FORCE ACCEPT ALL LICENSES (IMPORTANT FIX)
+      - name: Accept ALL Android SDK licenses
         run: |
-          export ANDROID_HOME=/usr/local/lib/android/sdk
-          export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
-          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-          yes | sdkmanager \
+      # ✅ Install required SDK packages AFTER licenses
+      - name: Install Android SDK packages
+        run: |
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
             "platform-tools" \
             "platforms;android-34" \
-            "build-tools;34.0.0" \
-            "cmdline-tools;latest"
+            "build-tools;34.0.0"
 
       - name: Generate temporary keystore
         run: |
@@ -56,29 +57,26 @@ jobs:
             -keypass 123456 \
             -dname "CN=FunGenNew, OU=Dev, O=FunGen, L=Mumbai, ST=MH, C=IN"
 
-      - name: Build APK + AAB
+      - name: Build APK + AAB (NO DEVICE REQUIRED)
         working-directory: FunGenNew/android
         env:
           KEYSTORE_PASSWORD: 123456
           KEY_ALIAS: fungentest
           KEY_PASSWORD: 123456
-          ANDROID_HOME: /usr/local/lib/android/sdk
-          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
         run: |
+          chmod +x gradlew
           ./gradlew clean
-          ./gradlew assembleRelease
-          ./gradlew bundleRelease
+          ./gradlew assembleRelease --no-daemon
+          ./gradlew bundleRelease --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: FunGenNew-APK
           path: FunGenNew/android/app/build/outputs/apk/release/*.apk
-          retention-days: 30
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
           name: FunGenNew-AAB
           path: FunGenNew/android/app/build/outputs/bundle/release/*.aab
-          retention-days: 30
