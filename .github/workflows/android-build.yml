@@ -1,1 +1,107 @@
+name: Android Build (APK + AAB)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  android-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
+    steps:
+      # -------------------------
+      # Checkout code
+      # -------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -------------------------
+      # Node.js
+      # -------------------------
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install JS dependencies
+        working-directory: FunGenNew
+        run: |
+          npm install --legacy-peer-deps
+
+      # -------------------------
+      # Java 17
+      # -------------------------
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      # -------------------------
+      # Android SDK
+      # -------------------------
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
+          yes | sdkmanager \
+            "platform-tools" \
+            "platforms;android-34" \
+            "build-tools;34.0.0" \
+            "cmdline-tools;latest"
+
+      # -------------------------
+      # Keystore (temporary)
+      # -------------------------
+      - name: Generate temporary release keystore
+        run: |
+          keytool -genkeypair -v \
+            -storetype PKCS12 \
+            -keystore FunGenNew/android/app/release.keystore \
+            -alias fungentest \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass 123456 \
+            -keypass 123456 \
+            -dname "CN=FunGen, OU=Dev, O=FunGen, L=Mumbai, ST=MH, C=IN"
+
+      # -------------------------
+      # Build APK + AAB
+      # -------------------------
+      - name: Build Release APK and AAB
+        working-directory: FunGenNew/android
+        env:
+          KEYSTORE_PASSWORD: 123456
+          KEY_ALIAS: fungentest
+          KEY_PASSWORD: 123456
+        run: |
+          chmod +x gradlew
+          ./gradlew clean
+          ./gradlew assembleRelease
+          ./gradlew bundleRelease
+
+      # -------------------------
+      # Upload artifacts
+      # -------------------------
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: FunGenNew-APK
+          path: FunGenNew/android/app/build/outputs/apk/release/*.apk
+          retention-days: 30
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: FunGenNew-AAB
+          path: FunGenNew/android/app/build/outputs/bundle/release/*.aab
+          retention-days: 30
 
