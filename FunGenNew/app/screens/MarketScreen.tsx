@@ -12,7 +12,6 @@ import {
 const MARKET_DATA_URL =
   'https://drive.google.com/uc?export=download&id=1t9fYO6ry9igdt3DZqlBqakMArBA4CdUK';
 
-
 /* ======================
    DRIVE JSON TYPE
    ====================== */
@@ -41,16 +40,12 @@ type MarketData = {
   zones: {
     support: {
       strike: number;
-      put_oi: number;
       put_oi_change: number;
-      call_oi: number;
       call_oi_change: number;
     }[];
     resistance: {
       strike: number;
-      call_oi: number;
       call_oi_change: number;
-      put_oi: number;
       put_oi_change: number;
     }[];
   };
@@ -59,8 +54,6 @@ type MarketData = {
     bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
     confidence: 'LOW' | 'MODERATE' | 'HIGH';
   };
-
-  disclaimer: string;
 };
 
 export default function MarketScreen() {
@@ -75,7 +68,7 @@ export default function MarketScreen() {
       const res = await fetch(MARKET_DATA_URL);
       const json = await res.json();
       setData(json);
-    } catch (e) {
+    } catch {
       setError(true);
     } finally {
       setLoading(false);
@@ -110,19 +103,13 @@ export default function MarketScreen() {
   }
 
   /* ======================
-     DERIVED DISPLAY VALUES
+     DERIVED UI VALUES
      ====================== */
   const isBullish = data.final_decision.bias === 'BULLISH';
 
-  const nearestSupport =
-    data.zones.support.length > 0
-      ? data.zones.support[0].strike
-      : '-';
-
-  const nearestResistance =
-    data.zones.resistance.length > 0
-      ? data.zones.resistance[0].strike
-      : '-';
+  const trendArrow =
+    data.key_indicators.net_oi_change > 0 ? '⬆️' :
+    data.key_indicators.net_oi_change < 0 ? '⬇️' : '➡️';
 
   return (
     <ScrollView
@@ -142,7 +129,7 @@ export default function MarketScreen() {
           {isBullish ? '📈' : '📉'}
         </Text>
         <Text style={styles.moodText}>
-          Market is {data.final_decision.bias} ({data.final_decision.confidence})
+          {data.final_decision.bias} ({data.final_decision.confidence})
         </Text>
       </View>
 
@@ -162,32 +149,48 @@ export default function MarketScreen() {
         </View>
       </View>
 
-      {/* SUPPORT / RESISTANCE */}
-      <View style={styles.row}>
-        <View style={styles.card}>
-          <Text style={styles.label}>Support</Text>
-          <Text style={styles.value}>{nearestSupport}</Text>
-        </View>
-        <View style={styles.card}>
-          <Text style={styles.label}>Resistance</Text>
-          <Text style={styles.value}>{nearestResistance}</Text>
-        </View>
-      </View>
-
-      {/* SUMMARY (DERIVED, SAFE) */}
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryText}>
-          Spot {data.spot_price} · Net OI {data.key_indicators.net_oi_change}
+      {/* TREND */}
+      <View style={styles.card}>
+        <Text style={styles.label}>Market Trend</Text>
+        <Text style={styles.value}>
+          {trendArrow} Net OI {data.key_indicators.net_oi_change}
         </Text>
       </View>
+
+      {/* SUPPORT TABLE */}
+      <Text style={styles.sectionTitle}>Support Levels</Text>
+      {data.zones.support.map((s, i) => (
+        <View key={i} style={styles.tableRow}>
+          <Text style={styles.tableCell}>Strike {s.strike}</Text>
+          <Text style={styles.tableCell}>Put ΔOI {s.put_oi_change}</Text>
+        </View>
+      ))}
+
+      {/* RESISTANCE TABLE */}
+      <Text style={styles.sectionTitle}>Resistance Levels</Text>
+      {data.zones.resistance.map((r, i) => (
+        <View key={i} style={styles.tableRow}>
+          <Text style={styles.tableCell}>Strike {r.strike}</Text>
+          <Text style={styles.tableCell}>Call ΔOI {r.call_oi_change}</Text>
+        </View>
+      ))}
+
+      {/* SIGNALS */}
+      <Text style={styles.sectionTitle}>Market Signals</Text>
+      {data.market_outlook.signals.map((signal, i) => (
+        <Text key={i} style={styles.signalText}>
+          • {signal}
+        </Text>
+      ))}
 
       {/* FOOTER */}
       <Text style={styles.timestamp}>
         Last updated: {data.timestamp}
       </Text>
 
+      {/* UI-LEVEL DISCLAIMER */}
       <Text style={styles.disclaimer}>
-        {data.disclaimer}
+        ⚠️ Educational purpose only. This is not financial advice.
       </Text>
     </ScrollView>
   );
