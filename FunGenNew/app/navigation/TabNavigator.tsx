@@ -8,6 +8,8 @@ import QuotesScreen from '../screens/QuotesScreen';
 import FactsScreen from '../screens/FactsScreen';
 import GamesScreen from '../screens/GamesScreen';
 import MarketScreen from '../screens/MarketScreen';
+import { Ionicons } from '@expo/vector-icons';
+
 
 const Tab = createBottomTabNavigator();
 
