@@ -4260,7 +4260,7 @@ expo-server@^1.0.5:
   resolved "https://registry.npmjs.org/expo-server/-/expo-server-1.0.5.tgz"
   integrity sha512-IGR++flYH70rhLyeXF0Phle56/k4cee87WeQ4mamS+MkVAVP+dDlOHf2nN06Z9Y2KhU0Gp1k+y61KkghF7HdhA==
 
-expo@*:
+expo@*, expo@^54.0.29:
   version "54.0.29"
   resolved "https://registry.npmjs.org/expo/-/expo-54.0.29.tgz"
   integrity sha512-9C90gyOzV83y2S3XzCbRDCuKYNaiyCzuP9ketv46acHCEZn+QTamPK/DobdghoSiofCmlfoaiD6/SzfxDiHMnw==
@@ -5741,6 +5741,11 @@ lightningcss-linux-x64-gnu@1.30.2:
   version "1.30.2"
   resolved "https://registry.npmjs.org/lightningcss-linux-x64-gnu/-/lightningcss-linux-x64-gnu-1.30.2.tgz"
   integrity sha512-Cfd46gdmj1vQ+lR6VRTTadNHu6ALuw2pKR9lYq4FnhvgBc4zWY1EtZcAc6EffShbb1MFrIPfLDXD6Xprbnni4w==
+
+lightningcss-linux-x64-musl@1.30.2:
+  version "1.30.2"
+  resolved "https://registry.npmjs.org/lightningcss-linux-x64-musl/-/lightningcss-linux-x64-musl-1.30.2.tgz"
+  integrity sha512-XJaLUUFXb6/QG2lGIW6aIk6jKdtjtcffUT0NKvIqhSBY3hh9Ch+1LCeH80dR9q9LBjG3ewbDjnumefsLsP6aiA==
 
 lightningcss@^1.30.1:
   version "1.30.2"
