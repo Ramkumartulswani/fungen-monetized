@@ -1,165 +1,129 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
-  ActivityIndicator,
-  Animated,
-  Dimensions,
   StyleSheet,
-  Alert,
+  TouchableOpacity,
+  Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
-/* ======================
-   TYPES
-====================== */
-type Joke = {
-  id: string;
-  setup: string;
-  punchline: string;
-  category: string;
-  gradient: string[];
-};
-
 type Category = 'ALL' | 'PROGRAMMING' | 'DAD' | 'CLEAN';
 
-/* ======================
-   CONSTANTS
-====================== */
-const CACHE_KEY = 'CACHED_JOKES_V1';
-
-const GRADIENTS = [
-  ['#667eea', '#764ba2'],
-  ['#f093fb', '#f5576c'],
-  ['#4facfe', '#00f2fe'],
-  ['#43e97b', '#38f9d7'],
-  ['#fa709a', '#fee140'],
-];
-
-/* ======================
-   HELPERS
-====================== */
-const randomGradient = () =>
-  GRADIENTS[Math.floor(Math.random() * GRADIENTS.length)];
-
-const shuffle = <T,>(array: T[]): T[] =>
-  [...array].sort(() => Math.random() - 0.5);
-
-/* ======================
-   NORMALIZERS
-====================== */
-const normalizeOfficial = (j: any): Joke => ({
-  id: `off-${j.id}`,
-  setup: j.setup,
-  punchline: j.punchline,
-  category: j.type?.toUpperCase() || 'GENERAL',
-  gradient: randomGradient(),
-});
-
-const normalizeJokeAPI = (j: any): Joke => ({
-  id: `api-${Math.random()}`,
-  setup: j.setup,
-  punchline: j.delivery,
-  category: j.category?.toUpperCase() || 'GENERAL',
-  gradient: randomGradient(),
-});
-
-/* ======================
-   FETCH LOGIC (SAFE)
-====================== */
-const fetchMixedJokes = async (): Promise<Joke[]> => {
-  try {
-    const [officialRes, apiRes] = await Promise.all([
-      fetch('https://official-joke-api.appspot.com/jokes/ten'),
-      fetch(
-        'https://v2.jokeapi.dev/joke/Programming,Dad,Clean?type=twopart&amount=10'
-      ),
-    ]);
-
-    const officialData = await officialRes.json();
-    const apiData = await apiRes.json();
-
-    const officialJokes = Array.isArray(officialData)
-      ? officialData.map(normalizeOfficial)
-      : [];
-
-    const apiRaw = Array.isArray(apiData.jokes)
-      ? apiData.jokes
-      : apiData.setup
-      ? [apiData]
-      : [];
-
-    const apiJokes = apiRaw.map(normalizeJokeAPI);
-
-    return shuffle([...officialJokes, ...apiJokes]);
-  } catch {
-    return [];
-  }
+type Joke = {
+  id: number;
+  setup: string;
+  punchline: string;
+  category: Category;
 };
 
-/* ======================
-   MAIN SCREEN
-====================== */
 export default function JokesScreen() {
   const [jokes, setJokes] = useState<Joke[]>([]);
+  const [category, setCategory] = useState<Category>('ALL');
   const [index, setIndex] = useState(0);
   const [showPunchline, setShowPunchline] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [category, setCategory] = useState<Category>('ALL');
-
-  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   /* ======================
-     LOAD JOKES
-  ====================== */
-  const loadJokes = async () => {
-    setLoading(true);
-    fadeAnim.setValue(0);
+     FETCH JOKES BY CATEGORY
+     ====================== */
+  const fetchJokesByCategory = async (cat: Category) => {
+    try {
+      let fetched: Joke[] = [];
 
-    const fresh = await fetchMixedJokes();
+      if (cat === 'PROGRAMMING') {
+        const res = await fetch(
+          'https://v2.jokeapi.dev/joke/Programming?type=twopart&amount=6&safe-mode'
+        );
+        const data = await res.json();
+        fetched = data.jokes.map((j: any) => ({
+          id: j.id,
+          setup: j.setup,
+          punchline: j.delivery,
+          category: 'PROGRAMMING',
+        }));
+      } else {
+        const res = await fetch(
+          'https://official-joke-api.appspot.com/jokes/general/ten'
+        );
+        const data = await res.json();
+        fetched = data.map((j: any) => ({
+          id: j.id,
+          setup: j.setup,
+          punchline: j.punchline,
+          category: 'DAD',
+        }));
+      }
 
-    if (fresh.length > 0) {
-      setJokes(fresh);
-      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(fresh));
-    } else {
-      const cached = await AsyncStorage.getItem(CACHE_KEY);
-      if (cached) setJokes(JSON.parse(cached));
-      else Alert.alert('No jokes available 😢');
+      return fetched;
+    } catch {
+      return [];
     }
-
-    setIndex(0);
-    setShowPunchline(false);
-    setLoading(false);
-
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 400,
-      useNativeDriver: true,
-    }).start();
   };
 
+  /* ======================
+     INITIAL LOAD
+     ====================== */
   useEffect(() => {
-    loadJokes();
+    const init = async () => {
+      setLoading(true);
+      const base = await fetchJokesByCategory('ALL');
+      setJokes(base);
+      setLoading(false);
+    };
+    init();
   }, []);
 
   /* ======================
-     FILTERING
-  ====================== */
+     AUTO REFILL ON CATEGORY CHANGE
+     ====================== */
+  useEffect(() => {
+    const ensureJokes = async () => {
+      const filtered =
+        category === 'ALL'
+          ? jokes
+          : jokes.filter((j) => j.category === category);
+
+      if (filtered.length === 0) {
+        const more = await fetchJokesByCategory(category);
+        if (more.length > 0) {
+          setJokes((prev) => [...prev, ...more]);
+          setIndex(0);
+          setShowPunchline(false);
+        }
+      }
+    };
+
+    ensureJokes();
+  }, [category]);
+
+  /* ======================
+     SAFE CURRENT JOKE
+     ====================== */
   const filteredJokes =
     category === 'ALL'
       ? jokes
-      : jokes.filter((j) => j.category.includes(category));
+      : jokes.filter((j) => j.category === category);
 
-  const currentJoke = filteredJokes[index];
+  const currentJoke =
+    filteredJokes[index] || filteredJokes[0] || jokes[0];
 
-  /* ======================
-     UI STATES
-  ====================== */
-  if (loading) {
+  const nextJoke = () => {
+    setShowPunchline(false);
+    setIndex((prev) => (prev + 1) % filteredJokes.length);
+  };
+
+  const prevJoke = () => {
+    setShowPunchline(false);
+    setIndex((prev) =>
+      prev === 0 ? filteredJokes.length - 1 : prev - 1
+    );
+  };
+
+  if (loading || !currentJoke) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#6366f1" />
@@ -168,37 +132,20 @@ export default function JokesScreen() {
     );
   }
 
-  if (!currentJoke) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.emptyText}>😢 No jokes found</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={loadJokes}>
-          <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  /* ======================
-     RENDER
-  ====================== */
   return (
     <View style={styles.container}>
       {/* HEADER */}
-      <LinearGradient colors={['#6366f1', '#8b5cf6']} style={styles.header}>
+      <LinearGradient colors={['#667eea', '#764ba2']} style={styles.header}>
         <Text style={styles.headerTitle}>😂 Jokes</Text>
-        <Text style={styles.headerSubtitle}>Fresh laughs, every tap</Text>
+        <Text style={styles.headerSubtitle}>Fresh laughs, nonstop</Text>
       </LinearGradient>
 
       {/* CATEGORY SELECTOR */}
-      <View style={styles.categories}>
+      <View style={styles.tabs}>
         {(['ALL', 'PROGRAMMING', 'DAD', 'CLEAN'] as Category[]).map((c) => (
           <TouchableOpacity
             key={c}
-            style={[
-              styles.categoryButton,
-              category === c && styles.categoryActive,
-            ]}
+            style={[styles.tab, category === c && styles.tabActive]}
             onPress={() => {
               setCategory(c);
               setIndex(0);
@@ -207,8 +154,8 @@ export default function JokesScreen() {
           >
             <Text
               style={[
-                styles.categoryText,
-                category === c && styles.categoryTextActive,
+                styles.tabText,
+                category === c && styles.tabTextActive,
               ]}
             >
               {c}
@@ -218,47 +165,35 @@ export default function JokesScreen() {
       </View>
 
       {/* JOKE CARD */}
-      <Animated.View style={{ opacity: fadeAnim, flex: 1 }}>
-        <LinearGradient
-          colors={currentJoke.gradient}
-          style={styles.card}
-        >
-          <Text style={styles.setup}>{currentJoke.setup}</Text>
+      <LinearGradient
+        colors={['#4facfe', '#00f2fe']}
+        style={styles.card}
+      >
+        <Text style={styles.setup}>{currentJoke.setup}</Text>
 
-          {!showPunchline ? (
-            <TouchableOpacity
-              style={styles.revealButton}
-              onPress={() => setShowPunchline(true)}
-            >
-              <Text style={styles.revealText}>Tap to reveal 👇</Text>
-            </TouchableOpacity>
-          ) : (
-            <Text style={styles.punchline}>{currentJoke.punchline}</Text>
-          )}
-        </LinearGradient>
-      </Animated.View>
+        {!showPunchline ? (
+          <TouchableOpacity
+            style={styles.revealButton}
+            onPress={() => setShowPunchline(true)}
+          >
+            <Text style={styles.revealText}>Tap for punchline 👇</Text>
+          </TouchableOpacity>
+        ) : (
+          <Text style={styles.punchline}>{currentJoke.punchline}</Text>
+        )}
+      </LinearGradient>
 
       {/* NAVIGATION */}
       <View style={styles.nav}>
-        <TouchableOpacity
-          onPress={() => {
-            setShowPunchline(false);
-            setIndex((i) => (i - 1 + filteredJokes.length) % filteredJokes.length);
-          }}
-        >
-          <Text style={styles.navText}>← Prev</Text>
+        <TouchableOpacity onPress={prevJoke}>
+          <Text style={styles.navText}>← Back</Text>
         </TouchableOpacity>
 
         <Text style={styles.counter}>
           {index + 1} / {filteredJokes.length}
         </Text>
 
-        <TouchableOpacity
-          onPress={() => {
-            setShowPunchline(false);
-            setIndex((i) => (i + 1) % filteredJokes.length);
-          }}
-        >
+        <TouchableOpacity onPress={nextJoke}>
           <Text style={styles.navText}>Next →</Text>
         </TouchableOpacity>
       </View>
@@ -268,68 +203,55 @@ export default function JokesScreen() {
 
 /* ======================
    STYLES
-====================== */
+   ====================== */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
-
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-
-  loadingText: { marginTop: 12, fontSize: 16, color: '#64748b' },
-
-  emptyText: { fontSize: 18, marginBottom: 12 },
-
-  retryButton: {
-    backgroundColor: '#6366f1',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  retryText: { color: '#fff', fontWeight: '600' },
+  loadingText: { marginTop: 12, color: '#64748b' },
 
   header: { padding: 30, paddingTop: 60 },
   headerTitle: { fontSize: 32, fontWeight: 'bold', color: '#fff' },
-  headerSubtitle: { fontSize: 16, color: '#e0e7ff', marginTop: 4 },
+  headerSubtitle: { fontSize: 18, color: '#fff', opacity: 0.9 },
 
-  categories: {
+  tabs: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginVertical: 12,
+    marginVertical: 16,
   },
-  categoryButton: {
+  tab: {
     paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
+    paddingHorizontal: 14,
+    borderRadius: 14,
     backgroundColor: '#e5e7eb',
   },
-  categoryActive: { backgroundColor: '#6366f1' },
-  categoryText: { fontSize: 14, color: '#374151', fontWeight: '600' },
-  categoryTextActive: { color: '#fff' },
+  tabActive: { backgroundColor: '#6366f1' },
+  tabText: { color: '#334155', fontWeight: '600' },
+  tabTextActive: { color: '#fff' },
 
   card: {
     margin: 20,
-    borderRadius: 24,
     padding: 30,
+    borderRadius: 26,
+    minHeight: 280,
     justifyContent: 'center',
-    flex: 1,
   },
   setup: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 26,
+    fontWeight: 'bold',
     color: '#fff',
     textAlign: 'center',
     marginBottom: 20,
   },
   revealButton: {
-    alignSelf: 'center',
     backgroundColor: 'rgba(255,255,255,0.3)',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    padding: 14,
     borderRadius: 14,
+    alignSelf: 'center',
   },
-  revealText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  revealText: { color: '#fff', fontSize: 18, fontWeight: '600' },
   punchline: {
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 24,
+    fontWeight: 'bold',
     color: '#fff',
     textAlign: 'center',
   },
@@ -337,9 +259,9 @@ const styles = StyleSheet.create({
   nav: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 30,
-    paddingBottom: 20,
+    marginHorizontal: 40,
+    alignItems: 'center',
   },
-  navText: { fontSize: 16, color: '#6366f1', fontWeight: '600' },
+  navText: { fontSize: 18, color: '#6366f1', fontWeight: '600' },
   counter: { fontSize: 16, color: '#64748b' },
 });
