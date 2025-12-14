@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 
 const MARKET_DATA_URL =
-  'https://drive.google.com/uc?export=download&id=1Je1mwoLqxhULWpuNknkyz6X-gg9IloVt';
+  'https://drive.google.com/uc?export=download&id=1t9fYO6ry9igdt3DZqlBqakMArBA4CdUK';
+
 
 /* ======================
    DRIVE JSON TYPE
