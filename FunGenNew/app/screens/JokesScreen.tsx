@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-import LinearGradient from 'react-native-linear-gradient';
   View,
   Text,
   StyleSheet,
@@ -10,7 +9,6 @@ import LinearGradient from 'react-native-linear-gradient';
   ScrollView,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-
 
 const { width, height } = Dimensions.get('window');
 
