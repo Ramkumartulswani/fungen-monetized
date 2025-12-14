@@ -10,6 +10,7 @@ import {
   Animated,
   TouchableOpacity,
   Dimensions,
+  StatusBar,
 } from 'react-native';
 
 /* ======================
@@ -93,15 +94,16 @@ export default function MarketScreen() {
   const [selectedIndex, setSelectedIndex] =
     useState<'NIFTY' | 'BANKNIFTY'>('NIFTY');
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'compact' | 'detailed'>('detailed');
 
   /* ======================
-     BIAS CHANGE ANIMATION
+     ANIMATIONS
      ====================== */
   const prevBiasRef = useRef<string | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
 
   const fetchMarketData = async () => {
     try {
@@ -110,17 +112,18 @@ export default function MarketScreen() {
       const res = await fetch(url);
       const json = await res.json();
       setData(json);
-      
+
       // Animate content on load
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 600,
+          duration: 800,
           useNativeDriver: true,
         }),
-        Animated.timing(slideAnim, {
+        Animated.spring(slideAnim, {
           toValue: 0,
-          duration: 600,
+          friction: 8,
+          tension: 40,
           useNativeDriver: true,
         }),
       ]).start();
@@ -135,7 +138,7 @@ export default function MarketScreen() {
   useEffect(() => {
     setLoading(true);
     fadeAnim.setValue(0);
-    slideAnim.setValue(50);
+    slideAnim.setValue(30);
     fetchMarketData();
   }, [selectedIndex]);
 
@@ -144,6 +147,24 @@ export default function MarketScreen() {
     const interval = setInterval(fetchMarketData, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [selectedIndex, autoRefresh]);
+
+  /* ======================
+     ROTATION ANIMATION
+     ====================== */
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(rotateAnim, {
+        toValue: 1,
+        duration: 3000,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, []);
+
+  const spin = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
 
   /* ======================
      PULSE ON BIAS CHANGE
@@ -156,13 +177,14 @@ export default function MarketScreen() {
     if (prevBiasRef.current && prevBiasRef.current !== currentBias) {
       Animated.sequence([
         Animated.timing(pulseAnim, {
-          toValue: 1.1,
-          duration: 250,
+          toValue: 1.12,
+          duration: 200,
           useNativeDriver: true,
         }),
-        Animated.timing(pulseAnim, {
+        Animated.spring(pulseAnim, {
           toValue: 1,
-          duration: 250,
+          friction: 3,
+          tension: 40,
           useNativeDriver: true,
         }),
       ]).start();
@@ -171,11 +193,11 @@ export default function MarketScreen() {
     prevBiasRef.current = currentBias;
   }, [data?.final_decision.bias]);
 
-  const toggleSection = (section: string) => {
-    setExpandedSection(expandedSection === section ? null : section);
+  const formatNumber = (num: number) => {
+    return new Intl.NumberFormat('en-IN', { notation: 'compact' }).format(num);
   };
 
-  const formatNumber = (num: number) => {
+  const formatNumberFull = (num: number) => {
     return new Intl.NumberFormat('en-IN').format(num);
   };
 
@@ -186,50 +208,66 @@ export default function MarketScreen() {
     }).format(price);
   };
 
-  const getConfidenceColor = (confidence: string) => {
+  const getConfidenceData = (confidence: string) => {
     switch (confidence) {
       case 'HIGH':
-        return '#10B981';
+        return { color: '#10B981', emoji: '🟢', label: 'HIGH' };
       case 'MODERATE':
-        return '#F59E0B';
+        return { color: '#F59E0B', emoji: '🟡', label: 'MODERATE' };
       case 'LOW':
-        return '#EF4444';
+        return { color: '#EF4444', emoji: '🔴', label: 'LOW' };
       default:
-        return '#6B7280';
+        return { color: '#6B7280', emoji: '⚪', label: 'UNKNOWN' };
     }
   };
 
-  const getBiasColors = (bias: string) => {
+  const getBiasData = (bias: string) => {
     switch (bias) {
       case 'BULLISH':
         return {
-          bg: '#ECFDF5',
+          gradient: ['#10B981', '#059669'],
+          emoji: '🐂',
+          icon: '📈',
+          bg: 'rgba(16, 185, 129, 0.1)',
           border: '#10B981',
-          text: '#059669',
-          gradient: ['#D1FAE5', '#ECFDF5'],
         };
       case 'BEARISH':
         return {
-          bg: '#FEF2F2',
+          gradient: ['#EF4444', '#DC2626'],
+          emoji: '🐻',
+          icon: '📉',
+          bg: 'rgba(239, 68, 68, 0.1)',
           border: '#EF4444',
-          text: '#DC2626',
-          gradient: ['#FEE2E2', '#FEF2F2'],
         };
       default:
         return {
-          bg: '#F3F4F6',
+          gradient: ['#6B7280', '#4B5563'],
+          emoji: '⚖️',
+          icon: '➡️',
+          bg: 'rgba(107, 114, 128, 0.1)',
           border: '#6B7280',
-          text: '#4B5563',
-          gradient: ['#E5E7EB', '#F3F4F6'],
         };
     }
+  };
+
+  const getPCRInterpretation = (pcr: number) => {
+    if (pcr > 1.2) return { text: 'Bullish', color: '#10B981', icon: '📈' };
+    if (pcr < 0.8) return { text: 'Bearish', color: '#EF4444', icon: '📉' };
+    return { text: 'Neutral', color: '#6B7280', icon: '➡️' };
+  };
+
+  const calculateOIStrength = (change: number, total: number) => {
+    return Math.min(Math.abs(change / total) * 100, 100);
   };
 
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#6366F1" />
-        <Text style={styles.loadingText}>Loading market data…</Text>
+        <Animated.View style={{ transform: [{ rotate: spin }] }}>
+          <Text style={styles.loadingEmoji}>📊</Text>
+        </Animated.View>
+        <Text style={styles.loadingText}>Analyzing market data...</Text>
+        <ActivityIndicator size="large" color="#6366F1" style={{ marginTop: 12 }} />
       </View>
     );
   }
@@ -238,9 +276,10 @@ export default function MarketScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.errorEmoji}>📉</Text>
-        <Text style={styles.errorText}>Failed to load market data</Text>
+        <Text style={styles.errorText}>Connection Lost</Text>
+        <Text style={styles.errorSubtext}>Unable to fetch market data</Text>
         <TouchableOpacity style={styles.retryButton} onPress={fetchMarketData}>
-          <Text style={styles.retryButtonText}>Retry</Text>
+          <Text style={styles.retryButtonText}>🔄 Retry Connection</Text>
         </TouchableOpacity>
       </View>
     );
@@ -249,455 +288,622 @@ export default function MarketScreen() {
   /* ======================
      DERIVED UI VALUES
      ====================== */
-  const biasColors = getBiasColors(data.final_decision.bias);
-  const isBullish = data.final_decision.bias === 'BULLISH';
-  const isBearish = data.final_decision.bias === 'BEARISH';
-
-  const trendArrow =
-    data.key_indicators.net_oi_change > 0
-      ? '⬆️'
-      : data.key_indicators.net_oi_change < 0
-      ? '⬇️'
-      : '➡️';
-
-  const pcrInterpretation =
-    data.key_indicators.pcr_oi > 1.2
-      ? 'Bullish'
-      : data.key_indicators.pcr_oi < 0.8
-      ? 'Bearish'
-      : 'Neutral';
+  const biasData = getBiasData(data.final_decision.bias);
+  const confidenceData = getConfidenceData(data.final_decision.confidence);
+  const pcrData = getPCRInterpretation(data.key_indicators.pcr_oi);
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl 
-          refreshing={refreshing} 
-          onRefresh={fetchMarketData}
-          tintColor="#6366F1"
-          colors={['#6366F1']}
-        />
-      }
-    >
-      <Animated.View
-        style={{
-          opacity: fadeAnim,
-          transform: [{ translateY: slideAnim }],
-        }}
+    <>
+      <StatusBar barStyle="dark-content" backgroundColor="#0F172A" />
+      <ScrollView
+        style={styles.container}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={fetchMarketData}
+            tintColor="#6366F1"
+            colors={['#6366F1', '#8B5CF6']}
+          />
+        }
       >
-        {/* HEADER */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>Market Analytics</Text>
-            <Text style={styles.headerSubtitle}>Real-time Options Flow</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.autoRefreshButton}
-            onPress={() => setAutoRefresh(!autoRefresh)}
-          >
-            <Text style={styles.autoRefreshText}>
-              {autoRefresh ? '🔄 Auto' : '⏸️ Manual'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* INDEX TOGGLE */}
-        <View style={styles.toggleContainer}>
-          {(['NIFTY', 'BANKNIFTY'] as const).map(idx => (
-            <TouchableOpacity
-              key={idx}
-              style={[
-                styles.toggleButton,
-                selectedIndex === idx && styles.toggleActive,
-              ]}
-              onPress={() => setSelectedIndex(idx)}
-            >
-              <Text
-                style={[
-                  styles.toggleButtonText,
-                  selectedIndex === idx && styles.toggleActiveText,
-                ]}
-              >
-                {idx}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* SPOT PRICE CARD */}
-        <View style={styles.spotCard}>
-          <Text style={styles.spotLabel}>{data.index} Spot</Text>
-          <Text style={styles.spotPrice}>₹{formatPrice(data.spot_price)}</Text>
-          <View style={styles.spotBadge}>
-            <Text style={styles.spotBadgeText}>Live</Text>
-          </View>
-        </View>
-
-        {/* MARKET BIAS CARD */}
         <Animated.View
-          style={[
-            styles.biasCard,
-            {
-              backgroundColor: biasColors.bg,
-              borderColor: biasColors.border,
-              transform: [{ scale: pulseAnim }],
-            },
-          ]}
+          style={{
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }],
+          }}
         >
-          <View style={styles.biasHeader}>
-            <Text style={styles.biasEmoji}>
-              {isBullish ? '🐂' : isBearish ? '🐻' : '⚖️'}
-            </Text>
-            <View style={styles.biasTextContainer}>
-              <Text style={[styles.biasText, { color: biasColors.text }]}>
-                {data.final_decision.bias}
-              </Text>
-              <View
-                style={[
-                  styles.confidenceBadge,
-                  { backgroundColor: getConfidenceColor(data.final_decision.confidence) },
-                ]}
-              >
-                <Text style={styles.confidenceText}>
-                  {data.final_decision.confidence} CONFIDENCE
-                </Text>
+          {/* PREMIUM HEADER */}
+          <View style={styles.premiumHeader}>
+            <View style={styles.headerGradient}>
+              <View style={styles.headerContent}>
+                <View>
+                  <Text style={styles.headerTitle}>Market Pulse</Text>
+                  <Text style={styles.headerSubtitle}>
+                    Live Options Flow Analysis
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.viewModeButton}
+                  onPress={() =>
+                    setViewMode(viewMode === 'compact' ? 'detailed' : 'compact')
+                  }
+                >
+                  <Text style={styles.viewModeIcon}>
+                    {viewMode === 'compact' ? '📋' : '📊'}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
 
-          {/* Score Bars */}
-          {(data.market_outlook.bullish_score > 0 ||
-            data.market_outlook.bearish_score > 0) && (
-            <View style={styles.scoreContainer}>
-              <View style={styles.scoreRow}>
-                <Text style={styles.scoreLabel}>Bull</Text>
-                <View style={styles.scoreBarContainer}>
+          {/* INDEX SELECTOR */}
+          <View style={styles.selectorContainer}>
+            <View style={styles.selectorWrapper}>
+              {(['NIFTY', 'BANKNIFTY'] as const).map((idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  style={[
+                    styles.selectorButton,
+                    selectedIndex === idx && styles.selectorActive,
+                  ]}
+                  onPress={() => setSelectedIndex(idx)}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.selectorText,
+                      selectedIndex === idx && styles.selectorTextActive,
+                    ]}
+                  >
+                    {idx}
+                  </Text>
+                  {selectedIndex === idx && (
+                    <View style={styles.activeIndicator} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={styles.refreshToggle}
+              onPress={() => setAutoRefresh(!autoRefresh)}
+            >
+              <Text style={styles.refreshIcon}>
+                {autoRefresh ? '🔄' : '⏸️'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* HERO SPOT PRICE */}
+          <View style={styles.heroCard}>
+            <View style={styles.heroContent}>
+              <View style={styles.spotPriceSection}>
+                <Text style={styles.indexLabel}>{data.index}</Text>
+                <Text style={styles.spotPrice}>₹{formatPrice(data.spot_price)}</Text>
+                <View style={styles.liveIndicator}>
+                  <View style={styles.liveDot} />
+                  <Text style={styles.liveText}>LIVE</Text>
+                </View>
+              </View>
+
+              <View style={styles.quickStats}>
+                <View style={styles.quickStat}>
+                  <Text style={styles.quickStatLabel}>PCR</Text>
+                  <Text style={styles.quickStatValue}>
+                    {data.key_indicators.pcr_oi.toFixed(2)}
+                  </Text>
+                </View>
+                <View style={styles.quickStatDivider} />
+                <View style={styles.quickStat}>
+                  <Text style={styles.quickStatLabel}>Net OI</Text>
+                  <Text
+                    style={[
+                      styles.quickStatValue,
+                      {
+                        color:
+                          data.key_indicators.net_oi_change > 0
+                            ? '#10B981'
+                            : '#EF4444',
+                      },
+                    ]}
+                  >
+                    {formatNumber(data.key_indicators.net_oi_change)}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* MARKET BIAS CARD */}
+          <Animated.View
+            style={[
+              styles.biasCard,
+              {
+                backgroundColor: biasData.bg,
+                borderColor: biasData.border,
+                transform: [{ scale: pulseAnim }],
+              },
+            ]}
+          >
+            <View style={styles.biasHeader}>
+              <View style={styles.biasLeft}>
+                <Text style={styles.biasEmoji}>{biasData.emoji}</Text>
+                <View>
+                  <Text style={[styles.biasTitle, { color: biasData.border }]}>
+                    {data.final_decision.bias}
+                  </Text>
+                  <View style={styles.confidenceRow}>
+                    <Text style={styles.confidenceEmoji}>
+                      {confidenceData.emoji}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.confidenceLabel,
+                        { color: confidenceData.color },
+                      ]}
+                    >
+                      {confidenceData.label} CONFIDENCE
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              <Text style={styles.biasIcon}>{biasData.icon}</Text>
+            </View>
+
+            {/* Sentiment Meter */}
+            {(data.market_outlook.bullish_score > 0 ||
+              data.market_outlook.bearish_score > 0) && (
+              <View style={styles.sentimentMeter}>
+                <View style={styles.meterHeader}>
+                  <Text style={styles.meterLabel}>Sentiment Analysis</Text>
+                  <Text style={styles.meterPercentage}>
+                    {Math.max(
+                      data.market_outlook.bullish_score,
+                      data.market_outlook.bearish_score
+                    )}
+                    %
+                  </Text>
+                </View>
+                <View style={styles.meterBar}>
                   <View
                     style={[
-                      styles.scoreBar,
-                      styles.bullishBar,
+                      styles.meterFillBull,
                       { width: `${data.market_outlook.bullish_score}%` },
                     ]}
                   />
-                </View>
-                <Text style={styles.scoreValue}>
-                  {data.market_outlook.bullish_score}%
-                </Text>
-              </View>
-              <View style={styles.scoreRow}>
-                <Text style={styles.scoreLabel}>Bear</Text>
-                <View style={styles.scoreBarContainer}>
                   <View
                     style={[
-                      styles.scoreBar,
-                      styles.bearishBar,
-                      { width: `${data.market_outlook.bearish_score}%` },
+                      styles.meterFillBear,
+                      {
+                        width: `${data.market_outlook.bearish_score}%`,
+                        right: 0,
+                        position: 'absolute',
+                      },
                     ]}
                   />
                 </View>
-                <Text style={styles.scoreValue}>
-                  {data.market_outlook.bearish_score}%
+                <View style={styles.meterLabels}>
+                  <Text style={styles.meterLabelBull}>
+                    Bull {data.market_outlook.bullish_score}%
+                  </Text>
+                  <Text style={styles.meterLabelBear}>
+                    Bear {data.market_outlook.bearish_score}%
+                  </Text>
+                </View>
+              </View>
+            )}
+          </Animated.View>
+
+          {/* KEY INDICATORS GRID */}
+          <View style={styles.indicatorsGrid}>
+            {/* PCR OI */}
+            <View style={styles.indicatorCard}>
+              <View style={styles.indicatorHeader}>
+                <Text style={styles.indicatorIcon}>📊</Text>
+                <View style={styles.indicatorBadge}>
+                  <Text style={styles.indicatorBadgeText}>PCR</Text>
+                </View>
+              </View>
+              <Text style={styles.indicatorValue}>
+                {data.key_indicators.pcr_oi.toFixed(3)}
+              </Text>
+              <View style={styles.indicatorFooter}>
+                <Text style={styles.indicatorLabel}>Put-Call Ratio</Text>
+                <View
+                  style={[
+                    styles.indicatorTag,
+                    { backgroundColor: pcrData.color + '20' },
+                  ]}
+                >
+                  <Text style={[styles.indicatorTagText, { color: pcrData.color }]}>
+                    {pcrData.icon} {pcrData.text}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* ATM PCR */}
+            <View style={styles.indicatorCard}>
+              <View style={styles.indicatorHeader}>
+                <Text style={styles.indicatorIcon}>🎯</Text>
+                <View style={styles.indicatorBadge}>
+                  <Text style={styles.indicatorBadgeText}>ATM</Text>
+                </View>
+              </View>
+              <Text style={styles.indicatorValue}>
+                {data.key_indicators.atm_pcr.toFixed(3)}
+              </Text>
+              <View style={styles.indicatorFooter}>
+                <Text style={styles.indicatorLabel}>At The Money</Text>
+                <Text style={styles.indicatorSubtext}>PCR Ratio</Text>
+              </View>
+            </View>
+
+            {/* Call OI Change */}
+            <View style={styles.indicatorCard}>
+              <View style={styles.indicatorHeader}>
+                <Text style={styles.indicatorIcon}>📞</Text>
+                <View
+                  style={[
+                    styles.indicatorBadge,
+                    {
+                      backgroundColor:
+                        data.key_indicators.call_oi_change > 0
+                          ? '#10B98120'
+                          : '#EF444420',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.indicatorBadgeText,
+                      {
+                        color:
+                          data.key_indicators.call_oi_change > 0
+                            ? '#10B981'
+                            : '#EF4444',
+                      },
+                    ]}
+                  >
+                    {data.key_indicators.call_oi_change > 0 ? '▲' : '▼'}
+                  </Text>
+                </View>
+              </View>
+              <Text
+                style={[
+                  styles.indicatorValue,
+                  {
+                    color:
+                      data.key_indicators.call_oi_change > 0
+                        ? '#10B981'
+                        : '#EF4444',
+                  },
+                ]}
+              >
+                {formatNumber(data.key_indicators.call_oi_change)}
+              </Text>
+              <View style={styles.indicatorFooter}>
+                <Text style={styles.indicatorLabel}>Call OI Change</Text>
+                <Text style={styles.indicatorSubtext}>
+                  {formatNumberFull(data.key_indicators.call_oi_change)}
                 </Text>
+              </View>
+            </View>
+
+            {/* Put OI Change */}
+            <View style={styles.indicatorCard}>
+              <View style={styles.indicatorHeader}>
+                <Text style={styles.indicatorIcon}>📝</Text>
+                <View
+                  style={[
+                    styles.indicatorBadge,
+                    {
+                      backgroundColor:
+                        data.key_indicators.put_oi_change > 0
+                          ? '#10B98120'
+                          : '#EF444420',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.indicatorBadgeText,
+                      {
+                        color:
+                          data.key_indicators.put_oi_change > 0
+                            ? '#10B981'
+                            : '#EF4444',
+                      },
+                    ]}
+                  >
+                    {data.key_indicators.put_oi_change > 0 ? '▲' : '▼'}
+                  </Text>
+                </View>
+              </View>
+              <Text
+                style={[
+                  styles.indicatorValue,
+                  {
+                    color:
+                      data.key_indicators.put_oi_change > 0 ? '#10B981' : '#EF4444',
+                  },
+                ]}
+              >
+                {formatNumber(data.key_indicators.put_oi_change)}
+              </Text>
+              <View style={styles.indicatorFooter}>
+                <Text style={styles.indicatorLabel}>Put OI Change</Text>
+                <Text style={styles.indicatorSubtext}>
+                  {formatNumberFull(data.key_indicators.put_oi_change)}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* ZONE TOTALS OVERVIEW */}
+          {data.zone_totals && (
+            <View style={styles.zoneTotalsCard}>
+              <Text style={styles.zoneTotalsTitle}>📈 Zone Activity Summary</Text>
+              <View style={styles.zoneTotalsGrid}>
+                <View style={styles.zoneTotalItem}>
+                  <Text style={styles.zoneTotalLabel}>Support Strength</Text>
+                  <Text style={styles.zoneTotalValueGreen}>
+                    +{formatNumber(data.zone_totals.support.put_oi_change)}
+                  </Text>
+                  <Text style={styles.zoneTotalSub}>Put accumulation</Text>
+                </View>
+                <View style={styles.zoneTotalDivider} />
+                <View style={styles.zoneTotalItem}>
+                  <Text style={styles.zoneTotalLabel}>Resistance Buildup</Text>
+                  <Text style={styles.zoneTotalValueRed}>
+                    +{formatNumber(data.zone_totals.resistance.call_oi_change)}
+                  </Text>
+                  <Text style={styles.zoneTotalSub}>Call accumulation</Text>
+                </View>
               </View>
             </View>
           )}
+
+          {/* SUPPORT ZONES */}
+          <View style={styles.zoneSection}>
+            <View style={styles.zoneSectionHeader}>
+              <View style={styles.zoneHeaderLeft}>
+                <Text style={styles.zoneEmoji}>🛡️</Text>
+                <Text style={styles.zoneTitle}>Support Zones</Text>
+              </View>
+              <View style={styles.zoneBadge}>
+                <Text style={styles.zoneBadgeText}>
+                  {data.zones.support.length} Levels
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.zoneCards}>
+              {data.zones.support.map((zone, index) => {
+                const strength = calculateOIStrength(
+                  zone.put_oi_change,
+                  zone.put_oi
+                );
+                return (
+                  <View key={index} style={styles.zoneCard}>
+                    <View style={styles.zoneCardHeader}>
+                      <View>
+                        <Text style={styles.strikePrice}>
+                          ₹{formatNumberFull(zone.strike)}
+                        </Text>
+                        <Text style={styles.zoneLevel}>Support {index + 1}</Text>
+                      </View>
+                      <View style={styles.strengthBadge}>
+                        <Text style={styles.strengthText}>
+                          {strength.toFixed(0)}%
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.oiRow}>
+                      <View style={styles.oiItem}>
+                        <Text style={styles.oiLabel}>Put OI</Text>
+                        <Text style={styles.oiValue}>
+                          {formatNumber(zone.put_oi)}
+                        </Text>
+                      </View>
+                      <View style={styles.oiItem}>
+                        <Text style={styles.oiLabel}>Put ΔOI</Text>
+                        <Text
+                          style={[
+                            styles.oiValue,
+                            {
+                              color:
+                                zone.put_oi_change > 0 ? '#10B981' : '#EF4444',
+                            },
+                          ]}
+                        >
+                          {zone.put_oi_change > 0 ? '+' : ''}
+                          {formatNumber(zone.put_oi_change)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.oiRow}>
+                      <View style={styles.oiItem}>
+                        <Text style={styles.oiLabel}>Call OI</Text>
+                        <Text style={styles.oiValue}>
+                          {formatNumber(zone.call_oi)}
+                        </Text>
+                      </View>
+                      <View style={styles.oiItem}>
+                        <Text style={styles.oiLabel}>Call ΔOI</Text>
+                        <Text
+                          style={[
+                            styles.oiValue,
+                            {
+                              color:
+                                zone.call_oi_change > 0 ? '#10B981' : '#EF4444',
+                            },
+                          ]}
+                        >
+                          {zone.call_oi_change > 0 ? '+' : ''}
+                          {formatNumber(zone.call_oi_change)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Strength Bar */}
+                    <View style={styles.strengthBar}>
+                      <View
+                        style={[
+                          styles.strengthFill,
+                          { width: `${strength}%`, backgroundColor: '#10B981' },
+                        ]}
+                      />
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* RESISTANCE ZONES */}
+          <View style={styles.zoneSection}>
+            <View style={styles.zoneSectionHeader}>
+              <View style={styles.zoneHeaderLeft}>
+                <Text style={styles.zoneEmoji}>⚔️</Text>
+                <Text style={styles.zoneTitle}>Resistance Zones</Text>
+              </View>
+              <View style={[styles.zoneBadge, styles.resistanceBadge]}>
+                <Text style={styles.zoneBadgeText}>
+                  {data.zones.resistance.length} Levels
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.zoneCards}>
+              {data.zones.resistance.map((zone, index) => {
+                const strength = calculateOIStrength(
+                  zone.call_oi_change,
+                  zone.call_oi
+                );
+                return (
+                  <View key={index} style={styles.zoneCard}>
+                    <View style={styles.zoneCardHeader}>
+                      <View>
+                        <Text style={styles.strikePrice}>
+                          ₹{formatNumberFull(zone.strike)}
+                        </Text>
+                        <Text style={styles.zoneLevel}>
+                          Resistance {index + 1}
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.strengthBadge,
+                          styles.resistanceStrengthBadge,
+                        ]}
+                      >
+                        <Text style={styles.strengthText}>
+                          {strength.toFixed(0)}%
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.oiRow}>
+                      <View style={styles.oiItem}>
+                        <Text style={styles.oiLabel}>Call OI</Text>
+                        <Text style={styles.oiValue}>
+                          {formatNumber(zone.call_oi)}
+                        </Text>
+                      </View>
+                      <View style={styles.oiItem}>
+                        <Text style={styles.oiLabel}>Call ΔOI</Text>
+                        <Text
+                          style={[
+                            styles.oiValue,
+                            {
+                              color:
+                                zone.call_oi_change > 0 ? '#10B981' : '#EF4444',
+                            },
+                          ]}
+                        >
+                          {zone.call_oi_change > 0 ? '+' : ''}
+                          {formatNumber(zone.call_oi_change)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.oiRow}>
+                      <View style={styles.oiItem}>
+                        <Text style={styles.oiLabel}>Put OI</Text>
+                        <Text style={styles.oiValue}>
+                          {formatNumber(zone.put_oi)}
+                        </Text>
+                      </View>
+                      <View style={styles.oiItem}>
+                        <Text style={styles.oiLabel}>Put ΔOI</Text>
+                        <Text
+                          style={[
+                            styles.oiValue,
+                            {
+                              color:
+                                zone.put_oi_change > 0 ? '#10B981' : '#EF4444',
+                            },
+                          ]}
+                        >
+                          {zone.put_oi_change > 0 ? '+' : ''}
+                          {formatNumber(zone.put_oi_change)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Strength Bar */}
+                    <View style={styles.strengthBar}>
+                      <View
+                        style={[
+                          styles.strengthFill,
+                          { width: `${strength}%`, backgroundColor: '#EF4444' },
+                        ]}
+                      />
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* MARKET SIGNALS */}
+          {data.market_outlook.signals.length > 0 && (
+            <View style={styles.signalsCard}>
+              <View style={styles.signalsHeader}>
+                <Text style={styles.signalsIcon}>💡</Text>
+                <Text style={styles.signalsTitle}>Market Intelligence</Text>
+              </View>
+              <View style={styles.signalsList}>
+                {data.market_outlook.signals.map((signal, index) => (
+                  <View key={index} style={styles.signalItem}>
+                    <View style={styles.signalDot} />
+                    <Text style={styles.signalText}>{signal}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* FOOTER INFO */}
+          <View style={styles.footerInfo}>
+            <View style={styles.timestampRow}>
+              <Text style={styles.timestampIcon}>🕐</Text>
+              <Text style={styles.timestampText}>{data.timestamp}</Text>
+            </View>
+            <View style={styles.disclaimerBox}>
+              <Text style={styles.disclaimerIcon}>⚠️</Text>
+              <Text style={styles.disclaimerText}>
+                {data.disclaimer || 'Educational purpose only. Not financial advice.'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={{ height: 40 }} />
         </Animated.View>
-
-        {/* KEY INDICATORS GRID */}
-        <View style={styles.gridContainer}>
-          <View style={styles.gridCard}>
-            <Text style={styles.gridIcon}>📊</Text>
-            <Text style={styles.gridLabel}>PCR OI</Text>
-            <Text style={styles.gridValue}>
-              {data.key_indicators.pcr_oi.toFixed(3)}
-            </Text>
-            <Text style={styles.gridSubtext}>{pcrInterpretation}</Text>
-          </View>
-
-          <View style={styles.gridCard}>
-            <Text style={styles.gridIcon}>🎯</Text>
-            <Text style={styles.gridLabel}>ATM PCR</Text>
-            <Text style={styles.gridValue}>
-              {data.key_indicators.atm_pcr.toFixed(3)}
-            </Text>
-            <Text style={styles.gridSubtext}>At The Money</Text>
-          </View>
-
-          <View style={styles.gridCard}>
-            <Text style={styles.gridIcon}>{trendArrow}</Text>
-            <Text style={styles.gridLabel}>Net OI Change</Text>
-            <Text
-              style={[
-                styles.gridValue,
-                {
-                  color:
-                    data.key_indicators.net_oi_change > 0
-                      ? '#10B981'
-                      : data.key_indicators.net_oi_change < 0
-                      ? '#EF4444'
-                      : '#6B7280',
-                },
-              ]}
-            >
-              {formatNumber(data.key_indicators.net_oi_change)}
-            </Text>
-            <Text style={styles.gridSubtext}>Open Interest</Text>
-          </View>
-
-          <View style={styles.gridCard}>
-            <Text style={styles.gridIcon}>📞</Text>
-            <Text style={styles.gridLabel}>Call ΔOI</Text>
-            <Text
-              style={[
-                styles.gridValue,
-                { color: data.key_indicators.call_oi_change > 0 ? '#10B981' : '#EF4444' },
-              ]}
-            >
-              {formatNumber(data.key_indicators.call_oi_change)}
-            </Text>
-            <Text style={styles.gridSubtext}>Change</Text>
-          </View>
-
-          <View style={styles.gridCard}>
-            <Text style={styles.gridIcon}>📝</Text>
-            <Text style={styles.gridLabel}>Put ΔOI</Text>
-            <Text
-              style={[
-                styles.gridValue,
-                { color: data.key_indicators.put_oi_change > 0 ? '#10B981' : '#EF4444' },
-              ]}
-            >
-              {formatNumber(data.key_indicators.put_oi_change)}
-            </Text>
-            <Text style={styles.gridSubtext}>Change</Text>
-          </View>
-        </View>
-
-        {/* SUPPORT LEVELS */}
-        <TouchableOpacity
-          style={styles.sectionHeader}
-          onPress={() => toggleSection('support')}
-        >
-          <View style={styles.sectionTitleRow}>
-            <Text style={styles.sectionIcon}>🛡️</Text>
-            <Text style={styles.sectionTitle}>Support Zones</Text>
-          </View>
-          <Text style={styles.expandIcon}>
-            {expandedSection === 'support' ? '▼' : '▶'}
-          </Text>
-        </TouchableOpacity>
-
-        {(expandedSection === 'support' || expandedSection === null) && (
-          <View style={styles.zoneContainer}>
-            {data.zones.support.map((s, i) => (
-              <View key={i} style={styles.zoneCard}>
-                <View style={styles.zoneHeader}>
-                  <Text style={styles.strikeText}>₹{formatNumber(s.strike)}</Text>
-                  <View style={styles.zoneBadge}>
-                    <Text style={styles.zoneBadgeText}>Support {i + 1}</Text>
-                  </View>
-                </View>
-                <View style={styles.zoneRow}>
-                  <View style={styles.zoneItem}>
-                    <Text style={styles.zoneItemLabel}>Put OI</Text>
-                    <Text style={styles.zoneItemValue}>
-                      {formatNumber(s.put_oi)}
-                    </Text>
-                  </View>
-                  <View style={styles.zoneItem}>
-                    <Text style={styles.zoneItemLabel}>Put ΔOI</Text>
-                    <Text
-                      style={[
-                        styles.zoneItemValue,
-                        { color: s.put_oi_change > 0 ? '#10B981' : '#EF4444' },
-                      ]}
-                    >
-                      {s.put_oi_change > 0 ? '+' : ''}
-                      {formatNumber(s.put_oi_change)}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.zoneRow}>
-                  <View style={styles.zoneItem}>
-                    <Text style={styles.zoneItemLabel}>Call OI</Text>
-                    <Text style={styles.zoneItemValue}>
-                      {formatNumber(s.call_oi)}
-                    </Text>
-                  </View>
-                  <View style={styles.zoneItem}>
-                    <Text style={styles.zoneItemLabel}>Call ΔOI</Text>
-                    <Text
-                      style={[
-                        styles.zoneItemValue,
-                        { color: s.call_oi_change > 0 ? '#10B981' : '#EF4444' },
-                      ]}
-                    >
-                      {s.call_oi_change > 0 ? '+' : ''}
-                      {formatNumber(s.call_oi_change)}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* RESISTANCE LEVELS */}
-        <TouchableOpacity
-          style={styles.sectionHeader}
-          onPress={() => toggleSection('resistance')}
-        >
-          <View style={styles.sectionTitleRow}>
-            <Text style={styles.sectionIcon}>⚔️</Text>
-            <Text style={styles.sectionTitle}>Resistance Zones</Text>
-          </View>
-          <Text style={styles.expandIcon}>
-            {expandedSection === 'resistance' ? '▼' : '▶'}
-          </Text>
-        </TouchableOpacity>
-
-        {(expandedSection === 'resistance' || expandedSection === null) && (
-          <View style={styles.zoneContainer}>
-            {data.zones.resistance.map((r, i) => (
-              <View key={i} style={styles.zoneCard}>
-                <View style={styles.zoneHeader}>
-                  <Text style={styles.strikeText}>₹{formatNumber(r.strike)}</Text>
-                  <View style={[styles.zoneBadge, styles.resistanceBadge]}>
-                    <Text style={styles.zoneBadgeText}>Resistance {i + 1}</Text>
-                  </View>
-                </View>
-                <View style={styles.zoneRow}>
-                  <View style={styles.zoneItem}>
-                    <Text style={styles.zoneItemLabel}>Call OI</Text>
-                    <Text style={styles.zoneItemValue}>
-                      {formatNumber(r.call_oi)}
-                    </Text>
-                  </View>
-                  <View style={styles.zoneItem}>
-                    <Text style={styles.zoneItemLabel}>Call ΔOI</Text>
-                    <Text
-                      style={[
-                        styles.zoneItemValue,
-                        { color: r.call_oi_change > 0 ? '#10B981' : '#EF4444' },
-                      ]}
-                    >
-                      {r.call_oi_change > 0 ? '+' : ''}
-                      {formatNumber(r.call_oi_change)}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.zoneRow}>
-                  <View style={styles.zoneItem}>
-                    <Text style={styles.zoneItemLabel}>Put OI</Text>
-                    <Text style={styles.zoneItemValue}>
-                      {formatNumber(r.put_oi)}
-                    </Text>
-                  </View>
-                  <View style={styles.zoneItem}>
-                    <Text style={styles.zoneItemLabel}>Put ΔOI</Text>
-                    <Text
-                      style={[
-                        styles.zoneItemValue,
-                        { color: r.put_oi_change > 0 ? '#10B981' : '#EF4444' },
-                      ]}
-                    >
-                      {r.put_oi_change > 0 ? '+' : ''}
-                      {formatNumber(r.put_oi_change)}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* ZONE TOTALS */}
-        {data.zone_totals && (
-          <View style={styles.totalsCard}>
-            <Text style={styles.totalsTitle}>Zone Totals Summary</Text>
-            <View style={styles.totalsGrid}>
-              <View style={styles.totalItem}>
-                <Text style={styles.totalLabel}>Support Put ΔOI</Text>
-                <Text
-                  style={[
-                    styles.totalValue,
-                    { color: '#10B981' },
-                  ]}
-                >
-                  +{formatNumber(data.zone_totals.support.put_oi_change)}
-                </Text>
-              </View>
-              <View style={styles.totalItem}>
-                <Text style={styles.totalLabel}>Support Call ΔOI</Text>
-                <Text
-                  style={[
-                    styles.totalValue,
-                    { color: '#EF4444' },
-                  ]}
-                >
-                  {formatNumber(data.zone_totals.support.call_oi_change)}
-                </Text>
-              </View>
-              <View style={styles.totalItem}>
-                <Text style={styles.totalLabel}>Resistance Call ΔOI</Text>
-                <Text
-                  style={[
-                    styles.totalValue,
-                    { color: '#10B981' },
-                  ]}
-                >
-                  +{formatNumber(data.zone_totals.resistance.call_oi_change)}
-                </Text>
-              </View>
-              <View style={styles.totalItem}>
-                <Text style={styles.totalLabel}>Resistance Put ΔOI</Text>
-                <Text
-                  style={[
-                    styles.totalValue,
-                    { color: data.zone_totals.resistance.put_oi_change > 0 ? '#10B981' : '#EF4444' },
-                  ]}
-                >
-                  {data.zone_totals.resistance.put_oi_change > 0 ? '+' : ''}
-                  {formatNumber(data.zone_totals.resistance.put_oi_change)}
-                </Text>
-              </View>
-            </View>
-          </View>
-        )}
-
-        {/* MARKET SIGNALS */}
-        <View style={styles.signalsCard}>
-          <View style={styles.signalsHeader}>
-            <Text style={styles.signalsIcon}>💡</Text>
-            <Text style={styles.signalsTitle}>Market Signals</Text>
-          </View>
-          {data.market_outlook.signals.map((signal, i) => (
-            <View key={i} style={styles.signalItem}>
-              <Text style={styles.signalBullet}>•</Text>
-              <Text style={styles.signalText}>{signal}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* TIMESTAMP */}
-        <View style={styles.timestampCard}>
-          <Text style={styles.timestampIcon}>🕐</Text>
-          <Text style={styles.timestampText}>
-            Last updated: {data.timestamp}
-          </Text>
-        </View>
-
-        {/* DISCLAIMER */}
-        <View style={styles.disclaimerCard}>
-          <Text style={styles.disclaimerIcon}>⚠️</Text>
-          <Text style={styles.disclaimerText}>
-            {data.disclaimer || 'Educational purpose only. This is not financial advice.'}
-          </Text>
-        </View>
-
-        {/* BOTTOM SPACING */}
-        <View style={{ height: 30 }} />
-      </Animated.View>
-    </ScrollView>
+      </ScrollView>
+    </>
   );
 }
