@@ -4,7 +4,6 @@ import styles from './MarketScreen.styles';
 import {
   View,
   Text,
-  StyleSheet,
   ActivityIndicator,
   RefreshControl,
   ScrollView,
@@ -13,15 +12,54 @@ import {
 const MARKET_DATA_URL =
   'https://drive.google.com/uc?export=download&id=1Je1mwoLqxhULWpuNknkyz6X-gg9IloVt';
 
+/* ======================
+   DRIVE JSON TYPE
+   ====================== */
 type MarketData = {
-  index: string;
   timestamp: string;
-  interval: string;
-  bias: 'Bullish' | 'Bearish' | string;
-  pcr: number;
-  support: number;
-  resistance: number;
-  summary: string;
+  heartbeat: number;
+  index: string;
+  spot_price: number;
+
+  key_indicators: {
+    pcr_oi: number;
+    atm_pcr: number;
+    call_oi_change: number;
+    put_oi_change: number;
+    net_oi_change: number;
+  };
+
+  market_outlook: {
+    direction: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+    confidence: 'LOW' | 'MODERATE' | 'HIGH';
+    signals: string[];
+    bullish_score: number;
+    bearish_score: number;
+  };
+
+  zones: {
+    support: {
+      strike: number;
+      put_oi: number;
+      put_oi_change: number;
+      call_oi: number;
+      call_oi_change: number;
+    }[];
+    resistance: {
+      strike: number;
+      call_oi: number;
+      call_oi_change: number;
+      put_oi: number;
+      put_oi_change: number;
+    }[];
+  };
+
+  final_decision: {
+    bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+    confidence: 'LOW' | 'MODERATE' | 'HIGH';
+  };
+
+  disclaimer: string;
 };
 
 export default function MarketScreen() {
@@ -46,8 +84,6 @@ export default function MarketScreen() {
 
   useEffect(() => {
     fetchMarketData();
-
-    // Auto refresh every 5 minutes
     const interval = setInterval(fetchMarketData, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
@@ -72,7 +108,20 @@ export default function MarketScreen() {
     );
   }
 
-  const isBullish = data.bias === 'Bullish';
+  /* ======================
+     DERIVED DISPLAY VALUES
+     ====================== */
+  const isBullish = data.final_decision.bias === 'BULLISH';
+
+  const nearestSupport =
+    data.zones.support.length > 0
+      ? data.zones.support[0].strike
+      : '-';
+
+  const nearestResistance =
+    data.zones.resistance.length > 0
+      ? data.zones.resistance[0].strike
+      : '-';
 
   return (
     <ScrollView
@@ -88,34 +137,47 @@ export default function MarketScreen() {
           { backgroundColor: isBullish ? '#E8F5E9' : '#FDECEA' },
         ]}
       >
-        <Text style={styles.moodEmoji}>{isBullish ? '📈' : '📉'}</Text>
+        <Text style={styles.moodEmoji}>
+          {isBullish ? '📈' : '📉'}
+        </Text>
         <Text style={styles.moodText}>
-          Market is {data.bias}
+          Market is {data.final_decision.bias} ({data.final_decision.confidence})
         </Text>
       </View>
 
-      {/* METRICS */}
+      {/* KEY METRICS */}
       <View style={styles.row}>
         <View style={styles.card}>
           <Text style={styles.label}>PCR</Text>
-          <Text style={styles.value}>{data.pcr}</Text>
+          <Text style={styles.value}>
+            {data.key_indicators.pcr_oi.toFixed(2)}
+          </Text>
+        </View>
+        <View style={styles.card}>
+          <Text style={styles.label}>ATM PCR</Text>
+          <Text style={styles.value}>
+            {data.key_indicators.atm_pcr.toFixed(2)}
+          </Text>
         </View>
       </View>
 
+      {/* SUPPORT / RESISTANCE */}
       <View style={styles.row}>
         <View style={styles.card}>
           <Text style={styles.label}>Support</Text>
-          <Text style={styles.value}>{data.support}</Text>
+          <Text style={styles.value}>{nearestSupport}</Text>
         </View>
         <View style={styles.card}>
           <Text style={styles.label}>Resistance</Text>
-          <Text style={styles.value}>{data.resistance}</Text>
+          <Text style={styles.value}>{nearestResistance}</Text>
         </View>
       </View>
 
-      {/* SUMMARY */}
+      {/* SUMMARY (DERIVED, SAFE) */}
       <View style={styles.summaryCard}>
-        <Text style={styles.summaryText}>{data.summary}</Text>
+        <Text style={styles.summaryText}>
+          Spot {data.spot_price} · Net OI {data.key_indicators.net_oi_change}
+        </Text>
       </View>
 
       {/* FOOTER */}
@@ -124,9 +186,8 @@ export default function MarketScreen() {
       </Text>
 
       <Text style={styles.disclaimer}>
-        ⚠️ Educational only. Not financial advice.
+        {data.disclaimer}
       </Text>
     </ScrollView>
   );
 }
-
