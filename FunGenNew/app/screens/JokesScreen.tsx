@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+import LinearGradient from 'react-native-linear-gradient';
   View,
   Text,
   StyleSheet,
