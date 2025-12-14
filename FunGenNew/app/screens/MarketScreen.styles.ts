@@ -1,4 +1,6 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Dimensions } from 'react-native';
+
+const { width } = Dimensions.get('window');
 
 export default StyleSheet.create({
   container: {
@@ -11,175 +13,299 @@ export default StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
-    padding: 20,
+    padding: 24,
+  },
+
+  /* ======================
+     LOADING STATE
+     ====================== */
+  loadingEmoji: {
+    fontSize: 80,
+    textAlign: 'center',
   },
 
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#64748B',
-    fontWeight: '500',
+    marginTop: 24,
+    fontSize: 18,
+    color: '#475569',
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
 
+  /* ======================
+     ERROR STATE
+     ====================== */
   errorEmoji: {
-    fontSize: 64,
+    fontSize: 72,
     marginBottom: 16,
   },
 
   errorText: {
-    fontSize: 18,
-    color: '#334155',
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1E293B',
     marginBottom: 8,
+    letterSpacing: -0.5,
+  },
+
+  errorSubtext: {
+    fontSize: 15,
+    color: '#64748B',
+    marginBottom: 24,
   },
 
   retryButton: {
-    marginTop: 16,
     backgroundColor: '#6366F1',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 14,
     shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 8,
   },
 
   retryButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 
   /* ======================
-     HEADER
+     PREMIUM HEADER
      ====================== */
-  header: {
+  premiumHeader: {
+    backgroundColor: '#0F172A',
+    overflow: 'hidden',
+  },
+
+  headerGradient: {
+    paddingTop: 16,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+  },
+
+  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 12,
   },
 
   headerTitle: {
-    fontSize: 28,
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -1,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+
+  headerSubtitle: {
+    fontSize: 13,
+    color: '#94A3B8',
+    marginTop: 4,
+    fontWeight: '600',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+
+  viewModeButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+
+  viewModeIcon: {
+    fontSize: 20,
+  },
+
+  /* ======================
+     INDEX SELECTOR
+     ====================== */
+  selectorContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
+    gap: 12,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+
+  selectorWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    padding: 4,
+    gap: 4,
+  },
+
+  selectorButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 8,
+    position: 'relative',
+  },
+
+  selectorActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+
+  selectorText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+    letterSpacing: 0.3,
+  },
+
+  selectorTextActive: {
+    color: '#6366F1',
+    fontWeight: '700',
+  },
+
+  activeIndicator: {
+    position: 'absolute',
+    bottom: -2,
+    left: '25%',
+    right: '25%',
+    height: 3,
+    backgroundColor: '#6366F1',
+    borderRadius: 2,
+  },
+
+  refreshToggle: {
+    width: 48,
+    height: 48,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+  },
+
+  refreshIcon: {
+    fontSize: 20,
+  },
+
+  /* ======================
+     HERO CARD
+     ====================== */
+  heroCard: {
+    marginHorizontal: 20,
+    marginTop: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+
+  heroContent: {
+    gap: 20,
+  },
+
+  spotPriceSection: {
+    position: 'relative',
+  },
+
+  indexLabel: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+
+  spotPrice: {
+    fontSize: 48,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -2,
+  },
+
+  liveIndicator: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10B981',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 6,
+  },
+
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FFFFFF',
+  },
+
+  liveText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+
+  quickStats: {
+    flexDirection: 'row',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 16,
+    gap: 20,
+  },
+
+  quickStat: {
+    flex: 1,
+  },
+
+  quickStatLabel: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+
+  quickStatValue: {
+    fontSize: 24,
     fontWeight: '700',
     color: '#0F172A',
     letterSpacing: -0.5,
   },
 
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#64748B',
-    marginTop: 2,
-    fontWeight: '500',
-  },
-
-  autoRefreshButton: {
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-
-  autoRefreshText: {
-    fontSize: 13,
-    color: '#475569',
-    fontWeight: '600',
-  },
-
-  /* ======================
-     INDEX TOGGLE
-     ====================== */
-  toggleContainer: {
-    flexDirection: 'row',
-    marginHorizontal: 20,
-    marginTop: 12,
-    marginBottom: 16,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 12,
-    padding: 4,
-  },
-
-  toggleButton: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-
-  toggleActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-
-  toggleButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-
-  toggleActiveText: {
-    color: '#6366F1',
-  },
-
-  /* ======================
-     SPOT PRICE CARD
-     ====================== */
-  spotCard: {
-    marginHorizontal: 20,
-    marginBottom: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3,
-    position: 'relative',
-  },
-
-  spotLabel: {
-    fontSize: 13,
-    color: '#64748B',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-
-  spotPrice: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginTop: 4,
-    letterSpacing: -1,
-  },
-
-  spotBadge: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    backgroundColor: '#10B981',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-
-  spotBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+  quickStatDivider: {
+    width: 1,
+    backgroundColor: '#E2E8F0',
   },
 
   /* ======================
@@ -187,230 +313,330 @@ export default StyleSheet.create({
      ====================== */
   biasCard: {
     marginHorizontal: 20,
-    marginBottom: 16,
-    borderRadius: 16,
+    marginTop: 16,
+    borderRadius: 20,
     padding: 20,
     borderWidth: 2,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 4,
   },
 
   biasHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+  },
+
+  biasLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
   },
 
   biasEmoji: {
-    fontSize: 48,
-    marginRight: 16,
+    fontSize: 56,
   },
 
-  biasTextContainer: {
-    flex: 1,
-  },
-
-  biasText: {
-    fontSize: 26,
-    fontWeight: '700',
+  biasTitle: {
+    fontSize: 28,
+    fontWeight: '800',
     letterSpacing: -0.5,
+    marginBottom: 6,
   },
 
-  confidenceBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginTop: 6,
-  },
-
-  confidenceText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-
-  scoreContainer: {
-    marginTop: 20,
-    gap: 12,
-  },
-
-  scoreRow: {
+  confidenceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 6,
   },
 
-  scoreLabel: {
-    width: 40,
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#475569',
+  confidenceEmoji: {
+    fontSize: 12,
   },
 
-  scoreBarContainer: {
-    flex: 1,
-    height: 8,
-    backgroundColor: '#E2E8F0',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-
-  scoreBar: {
-    height: '100%',
-    borderRadius: 4,
-  },
-
-  bullishBar: {
-    backgroundColor: '#10B981',
-  },
-
-  bearishBar: {
-    backgroundColor: '#EF4444',
-  },
-
-  scoreValue: {
-    width: 40,
-    textAlign: 'right',
-    fontSize: 13,
+  confidenceLabel: {
+    fontSize: 11,
     fontWeight: '700',
-    color: '#475569',
+    letterSpacing: 0.8,
+  },
+
+  biasIcon: {
+    fontSize: 40,
   },
 
   /* ======================
-     GRID INDICATORS
+     SENTIMENT METER
      ====================== */
-  gridContainer: {
+  sentimentMeter: {
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.05)',
+  },
+
+  meterHeader: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: 20,
-    marginBottom: 16,
-    gap: 12,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
 
-  gridCard: {
-    width: '48%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 16,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-
-  gridIcon: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
-
-  gridLabel: {
-    fontSize: 12,
-    color: '#64748B',
-    fontWeight: '600',
+  meterLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
 
-  gridValue: {
-    fontSize: 20,
-    fontWeight: '700',
+  meterPercentage: {
+    fontSize: 18,
+    fontWeight: '800',
     color: '#0F172A',
-    marginTop: 4,
-    letterSpacing: -0.5,
   },
 
-  gridSubtext: {
+  meterBar: {
+    height: 12,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 6,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+
+  meterFillBull: {
+    height: '100%',
+    backgroundColor: '#10B981',
+    position: 'absolute',
+    left: 0,
+  },
+
+  meterFillBear: {
+    height: '100%',
+    backgroundColor: '#EF4444',
+  },
+
+  meterLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+
+  meterLabelBull: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#10B981',
+  },
+
+  meterLabelBear: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#EF4444',
+  },
+
+  /* ======================
+     INDICATORS GRID
+     ====================== */
+  indicatorsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: 20,
+    marginTop: 16,
+    gap: 12,
+  },
+
+  indicatorCard: {
+    width: (width - 52) / 2,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+
+  indicatorHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+
+  indicatorIcon: {
+    fontSize: 28,
+  },
+
+  indicatorBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+
+  indicatorBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#475569',
+    letterSpacing: 0.5,
+  },
+
+  indicatorValue: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -1,
+    marginBottom: 8,
+  },
+
+  indicatorFooter: {
+    gap: 4,
+  },
+
+  indicatorLabel: {
     fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+
+  indicatorTag: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+
+  indicatorTagText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+
+  indicatorSubtext: {
+    fontSize: 10,
     color: '#94A3B8',
-    marginTop: 2,
     fontWeight: '500',
   },
 
   /* ======================
-     SECTION HEADERS
+     ZONE TOTALS CARD
      ====================== */
-  sectionHeader: {
+  zoneTotalsCard: {
+    marginHorizontal: 20,
+    marginTop: 16,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 2,
+    borderColor: '#FDE047',
+    shadowColor: '#EAB308',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+
+  zoneTotalsTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#713F12',
+    marginBottom: 16,
+    letterSpacing: -0.3,
+  },
+
+  zoneTotalsGrid: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+
+  zoneTotalItem: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 14,
+  },
+
+  zoneTotalLabel: {
+    fontSize: 10,
+    color: '#92400E',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+
+  zoneTotalValueGreen: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#10B981',
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+
+  zoneTotalValueRed: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#EF4444',
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+
+  zoneTotalSub: {
+    fontSize: 10,
+    color: '#78716C',
+    fontWeight: '500',
+  },
+
+  zoneTotalDivider: {
+    width: 2,
+    backgroundColor: '#FDE047',
+  },
+
+  /* ======================
+     ZONE SECTION
+     ====================== */
+  zoneSection: {
+    marginTop: 24,
+  },
+
+  zoneSectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginHorizontal: 20,
-    marginTop: 8,
     marginBottom: 12,
-    paddingVertical: 8,
   },
 
-  sectionTitleRow: {
+  zoneHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
 
-  sectionIcon: {
+  zoneEmoji: {
+    fontSize: 24,
+  },
+
+  zoneTitle: {
     fontSize: 20,
-  },
-
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#0F172A',
-    letterSpacing: -0.3,
-  },
-
-  expandIcon: {
-    fontSize: 16,
-    color: '#64748B',
-    fontWeight: '600',
-  },
-
-  /* ======================
-     ZONE CARDS
-     ====================== */
-  zoneContainer: {
-    marginHorizontal: 20,
-    marginBottom: 16,
-    gap: 12,
-  },
-
-  zoneCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 16,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    borderLeftWidth: 4,
-    borderLeftColor: '#6366F1',
-  },
-
-  zoneHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-
-  strikeText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0F172A',
-    letterSpacing: -0.3,
+    letterSpacing: -0.5,
   },
 
   zoneBadge: {
     backgroundColor: '#DBEAFE',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
 
   resistanceBadge: {
@@ -421,80 +647,107 @@ export default StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#1E40AF',
-    letterSpacing: 0.3,
+    letterSpacing: 0.5,
   },
 
-  zoneRow: {
+  zoneCards: {
+    marginHorizontal: 20,
+    gap: 12,
+  },
+
+  zoneCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+    borderLeftWidth: 4,
+    borderLeftColor: '#6366F1',
+  },
+
+  zoneCardHeader: {
     flexDirection: 'row',
-    gap: 16,
-    marginBottom: 8,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
 
-  zoneItem: {
-    flex: 1,
+  strikePrice: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.5,
+    marginBottom: 4,
   },
 
-  zoneItemLabel: {
+  zoneLevel: {
     fontSize: 11,
     color: '#64748B',
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 4,
   },
 
-  zoneItemValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0F172A',
-    letterSpacing: -0.3,
+  strengthBadge: {
+    backgroundColor: '#10B98120',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
 
-  /* ======================
-     ZONE TOTALS
-     ====================== */
-  totalsCard: {
-    marginHorizontal: 20,
-    marginBottom: 16,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 2,
-    borderColor: '#E2E8F0',
+  resistanceStrengthBadge: {
+    backgroundColor: '#EF444420',
   },
 
-  totalsTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 12,
-    letterSpacing: -0.2,
+  strengthText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#10B981',
   },
 
-  totalsGrid: {
+  oiRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 12,
+    marginBottom: 10,
   },
 
-  totalItem: {
-    width: '48%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    padding: 12,
+  oiItem: {
+    flex: 1,
   },
 
-  totalLabel: {
-    fontSize: 11,
+  oiLabel: {
+    fontSize: 10,
     color: '#64748B',
     fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
     marginBottom: 4,
   },
 
-  totalValue: {
+  oiValue: {
     fontSize: 16,
     fontWeight: '700',
+    color: '#0F172A',
     letterSpacing: -0.3,
+  },
+
+  strengthBar: {
+    height: 6,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+
+  strengthFill: {
+    height: '100%',
+    borderRadius: 3,
   },
 
   /* ======================
@@ -502,90 +755,94 @@ export default StyleSheet.create({
      ====================== */
   signalsCard: {
     marginHorizontal: 20,
-    marginBottom: 16,
-    backgroundColor: '#FFFBEB',
-    borderRadius: 14,
-    padding: 16,
+    marginTop: 24,
+    backgroundColor: '#F0F9FF',
+    borderRadius: 16,
+    padding: 20,
     borderWidth: 2,
-    borderColor: '#FDE047',
+    borderColor: '#BAE6FD',
   },
 
   signalsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
     gap: 10,
+    marginBottom: 16,
   },
 
   signalsIcon: {
-    fontSize: 20,
+    fontSize: 24,
   },
 
   signalsTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#854D0E',
-    letterSpacing: -0.2,
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#075985',
+    letterSpacing: -0.3,
+  },
+
+  signalsList: {
+    gap: 12,
   },
 
   signalItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 6,
+    gap: 12,
   },
 
-  signalBullet: {
-    fontSize: 18,
-    color: '#CA8A04',
-    marginRight: 8,
-    marginTop: -2,
+  signalDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#0EA5E9',
+    marginTop: 6,
   },
 
   signalText: {
     flex: 1,
     fontSize: 14,
-    color: '#713F12',
-    lineHeight: 20,
+    color: '#0C4A6E',
+    lineHeight: 22,
     fontWeight: '500',
   },
 
   /* ======================
-     TIMESTAMP
+     FOOTER
      ====================== */
-  timestampCard: {
+  footerInfo: {
     marginHorizontal: 20,
-    marginBottom: 12,
+    marginTop: 24,
+    gap: 12,
+  },
+
+  timestampRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#F1F5F9',
-    padding: 12,
-    borderRadius: 10,
+    gap: 10,
+    backgroundColor: '#F8FAFC',
+    padding: 14,
+    borderRadius: 12,
   },
 
   timestampIcon: {
-    fontSize: 16,
+    fontSize: 18,
   },
 
   timestampText: {
     flex: 1,
     fontSize: 13,
     color: '#475569',
-    fontWeight: '500',
+    fontWeight: '600',
   },
 
-  /* ======================
-     DISCLAIMER
-     ====================== */
-  disclaimerCard: {
-    marginHorizontal: 20,
-    marginBottom: 16,
+  disclaimerBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
     backgroundColor: '#FEF2F2',
     padding: 14,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#FEE2E2',
   },
