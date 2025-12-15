@@ -12,6 +12,7 @@ import {
   Alert,
   Modal,
   Share,
+  Platform,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -197,16 +198,14 @@ export default function MarketScreen() {
         }),
       ]).start();
 
-      // Check price alerts
       checkPriceAlerts(currentPrice);
     }
     prevPriceRef.current = currentPrice;
 
-    // Store historical data
     if (historicalData.length === 0 || 
         historicalData[historicalData.length - 1].price !== currentPrice) {
       setHistoricalData(prev => [
-        ...prev.slice(-20), // Keep last 20 data points
+        ...prev.slice(-20),
         { price: currentPrice, time: new Date().toLocaleTimeString() }
       ]);
     }
@@ -240,7 +239,6 @@ export default function MarketScreen() {
       const json = await res.json();
       setData(json);
 
-      // Update stats
       const newStats = {
         ...stats,
         viewCount: stats.viewCount + 1,
@@ -248,10 +246,8 @@ export default function MarketScreen() {
       };
       saveStats(newStats);
 
-      // Track view for home screen
       await AsyncStorage.setItem('MARKET_VIEWS', (stats.viewCount + 1).toString());
 
-      // Animate content
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -526,7 +522,6 @@ ${data.market_outlook.signals.slice(0, 3).map(s => `• ${s}`).join('\n')}
               </View>
             </View>
 
-            {/* Stats Row */}
             <View style={styles.headerStats}>
               <View style={styles.headerStat}>
                 <Text style={styles.headerStatValue}>{stats.viewCount}</Text>
@@ -545,7 +540,7 @@ ${data.market_outlook.signals.slice(0, 3).map(s => `• ${s}`).join('\n')}
             </View>
           </LinearGradient>
 
-          {/* INDEX SELECTOR & AUTO-REFRESH */}
+          {/* INDEX SELECTOR & CONTROLS */}
           <View style={styles.controlsRow}>
             <View style={styles.selectorContainer}>
               {(['NIFTY', 'BANKNIFTY'] as const).map((idx) => (
@@ -663,7 +658,6 @@ ${data.market_outlook.signals.slice(0, 3).map(s => `• ${s}`).join('\n')}
               </View>
             </View>
 
-            {/* Mini Price Chart */}
             {historicalData.length > 2 && (
               <View style={styles.miniChart}>
                 <Text style={styles.miniChartTitle}>Price Movement</Text>
@@ -680,7 +674,7 @@ ${data.market_outlook.signals.slice(0, 3).map(s => `• ${s}`).join('\n')}
                             {
                               height: height || 2,
                               backgroundColor:
-                                index > 0 && point.price >= historicalData[index - 1].price
+                                index > 0 && point.price >= historicalData.slice(-10)[index - 1].price
                                   ? '#10B981'
                                   : '#EF4444',
                             },
@@ -730,7 +724,6 @@ ${data.market_outlook.signals.slice(0, 3).map(s => `• ${s}`).join('\n')}
               <Text style={styles.biasIcon}>{biasData.icon}</Text>
             </View>
 
-            {/* Confidence Progress Bar */}
             <View style={styles.confidenceBar}>
               <View
                 style={[
@@ -743,7 +736,6 @@ ${data.market_outlook.signals.slice(0, 3).map(s => `• ${s}`).join('\n')}
               />
             </View>
 
-            {/* Sentiment Meter */}
             {(data.market_outlook.bullish_score > 0 ||
               data.market_outlook.bearish_score > 0) && (
               <View style={styles.sentimentMeter}>
@@ -932,7 +924,6 @@ ${data.market_outlook.signals.slice(0, 3).map(s => `• ${s}`).join('\n')}
                 </View>
               </View>
 
-              {/* ZONE TOTALS */}
               {data.zone_totals && (
                 <View style={styles.zoneTotalsCard}>
                   <Text style={styles.zoneTotalsTitle}>📈 Zone Activity Summary</Text>
@@ -956,7 +947,6 @@ ${data.market_outlook.signals.slice(0, 3).map(s => `• ${s}`).join('\n')}
                 </View>
               )}
 
-              {/* MARKET SIGNALS */}
               {data.market_outlook.signals.length > 0 && (
                 <View style={styles.signalsCard}>
                   <View style={styles.signalsHeader}>
@@ -976,19 +966,15 @@ ${data.market_outlook.signals.slice(0, 3).map(s => `• ${s}`).join('\n')}
             </>
           )}
 
-          {/* DETAILED VIEW - Full Indicators */}
           {viewMode === 'detailed' && (
             <View style={styles.detailedView}>
-              {/* All indicators with more detail... */}
               <Text style={styles.detailedTitle}>📊 Complete Analysis</Text>
-              {/* Add more detailed charts, tables, etc. */}
+              <Text style={styles.detailedSubtext}>Detailed view coming soon</Text>
             </View>
           )}
 
-          {/* ZONES VIEW */}
           {viewMode === 'zones' && (
             <>
-              {/* SUPPORT ZONES */}
               <View style={styles.zoneSection}>
                 <View style={styles.zoneSectionHeader}>
                   <View style={styles.zoneHeaderLeft}>
@@ -1062,7 +1048,6 @@ ${data.market_outlook.signals.slice(0, 3).map(s => `• ${s}`).join('\n')}
                 </View>
               </View>
 
-              {/* RESISTANCE ZONES */}
               <View style={styles.zoneSection}>
                 <View style={styles.zoneSectionHeader}>
                   <View style={styles.zoneHeaderLeft}>
@@ -1145,7 +1130,6 @@ ${data.market_outlook.signals.slice(0, 3).map(s => `• ${s}`).join('\n')}
             </>
           )}
 
-          {/* FOOTER INFO */}
           <View style={styles.footerInfo}>
             <View style={styles.timestampRow}>
               <Text style={styles.timestampIcon}>🕐</Text>
@@ -1163,7 +1147,7 @@ ${data.market_outlook.signals.slice(0, 3).map(s => `• ${s}`).join('\n')}
         </Animated.View>
       </ScrollView>
 
-      {/* PRICE ALERT MODAL */}
+      {/* MODALS */}
       <Modal
         visible={alertModalVisible}
         transparent
@@ -1174,7 +1158,6 @@ ${data.market_outlook.signals.slice(0, 3).map(s => `• ${s}`).join('\n')}
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>🔔 Price Alerts</Text>
             
-            {/* Active Alerts */}
             {activeAlerts.length > 0 && (
               <View style={styles.activeAlerts}>
                 <Text style={styles.activeAlertsTitle}>Active Alerts</Text>
@@ -1197,24 +1180,27 @@ ${data.market_outlook.signals.slice(0, 3).map(s => `• ${s}`).join('\n')}
               </View>
             )}
 
-            {/* Add New Alert */}
             <View style={styles.addAlertSection}>
               <Text style={styles.addAlertTitle}>Set New Alert</Text>
               <TouchableOpacity
                 style={styles.alertOption}
                 onPress={() => {
-                  Alert.prompt(
-                    'Price Alert',
-                    `Set alert when ${selectedIndex} goes above:`,
-                    (text) => {
-                      const price = parseFloat(text);
-                      if (!isNaN(price) && price > 0) {
-                        addPriceAlert(price, 'above');
-                      }
-                    },
-                    'plain-text',
-                    data.spot_price.toString()
-                  );
+                  if (Platform.OS === 'ios') {
+                    Alert.prompt(
+                      'Price Alert',
+                      `Set alert when ${selectedIndex} goes above:`,
+                      (text) => {
+                        const price = parseFloat(text);
+                        if (!isNaN(price) && price > 0) {
+                          addPriceAlert(price, 'above');
+                        }
+                      },
+                      'plain-text',
+                      data.spot_price.toString()
+                    );
+                  } else {
+                    Alert.alert('Price Alert', 'Enter target price in app settings');
+                  }
                 }}
               >
                 <Text style={styles.alertOptionText}>📈 Alert Above Current Price</Text>
@@ -1222,18 +1208,22 @@ ${data.market_outlook.signals.slice(0, 3).map(s => `• ${s}`).join('\n')}
               <TouchableOpacity
                 style={styles.alertOption}
                 onPress={() => {
-                  Alert.prompt(
-                    'Price Alert',
-                    `Set alert when ${selectedIndex} goes below:`,
-                    (text) => {
-                      const price = parseFloat(text);
-                      if (!isNaN(price) && price > 0) {
-                        addPriceAlert(price, 'below');
-                      }
-                    },
-                    'plain-text',
-                    data.spot_price.toString()
-                  );
+                  if (Platform.OS === 'ios') {
+                    Alert.prompt(
+                      'Price Alert',
+                      `Set alert when ${selectedIndex} goes below:`,
+                      (text) => {
+                        const price = parseFloat(text);
+                        if (!isNaN(price) && price > 0) {
+                          addPriceAlert(price, 'below');
+                        }
+                      },
+                      'plain-text',
+                      data.spot_price.toString()
+                    );
+                  } else {
+                    Alert.alert('Price Alert', 'Enter target price in app settings');
+                  }
                 }}
               >
                 <Text style={styles.alertOptionText}>📉 Alert Below Current Price</Text>
@@ -1250,7 +1240,6 @@ ${data.market_outlook.signals.slice(0, 3).map(s => `• ${s}`).join('\n')}
         </View>
       </Modal>
 
-      {/* SHARE MODAL */}
       <Modal
         visible={shareModalVisible}
         transparent
@@ -1275,7 +1264,6 @@ ${data.market_outlook.signals.slice(0, 3).map(s => `• ${s}`).join('\n')}
             <TouchableOpacity
               style={styles.shareOption}
               onPress={() => {
-                // Could implement screenshot sharing here
                 Alert.alert('Coming Soon', 'Screenshot sharing feature');
               }}
             >
@@ -1296,18 +1284,60 @@ ${data.market_outlook.signals.slice(0, 3).map(s => `• ${s}`).join('\n')}
   );
 }
 
-// Import styles from separate file or define inline
-// For brevity, I'll provide key new styles needed:
+const styles = StyleSheet.create({
+  // Base
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+  },
 
-const styles = {
-  // ... (keeping all original styles)
-  // Adding new styles for enhancements:
+  // Loading
+  loadingEmoji: { fontSize: 80, marginBottom: 20 },
+  loadingText: { fontSize: 16, color: '#64748B', fontWeight: '600' },
 
+  // Error
+  errorEmoji: { fontSize: 80, marginBottom: 20 },
+  errorText: { fontSize: 24, fontWeight: '800', color: '#0F172A', marginBottom: 8 },
+  errorSubtext: { fontSize: 16, color: '#64748B', marginBottom: 24 },
+  retryButton: {
+    backgroundColor: '#6366F1',
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  retryButtonText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+
+  // Header
+  premiumHeader: {
+    padding: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 24,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '500',
+  },
   headerActions: {
     flexDirection: 'row',
     gap: 12,
   },
-
   headerActionButton: {
     width: 40,
     height: 40,
@@ -1316,11 +1346,7 @@ const styles = {
     justifyContent: 'center',
     alignItems: 'center',
   },
-
-  headerActionIcon: {
-    fontSize: 20,
-  },
-
+  headerActionIcon: { fontSize: 20 },
   headerStats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -1329,28 +1355,23 @@ const styles = {
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
-
-  headerStat: {
-    alignItems: 'center',
-  },
-
+  headerStat: { alignItems: 'center' },
   headerStatValue: {
     fontSize: 20,
     fontWeight: '900',
     color: '#6366F1',
     marginBottom: 4,
   },
-
   headerStatLabel: {
     fontSize: 11,
     color: 'rgba(255, 255, 255, 0.6)',
   },
-
   headerStatDivider: {
     width: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
 
+  // Controls
   controlsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1359,20 +1380,20 @@ const styles = {
     marginTop: 20,
     marginBottom: 16,
   },
-
-  controlButtons: {
+  selectorContainer: {
     flexDirection: 'row',
-    gap: 12,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 4,
   },
-
-  controlButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
+  selectorButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
     position: 'relative',
+  },
+  selectorActive: {
+    backgroundColor: '#FFFFFF',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -1380,16 +1401,49 @@ const styles = {
         shadowOpacity: 0.1,
         shadowRadius: 4,
       },
-      android: {
-        elevation: 2,
-      },
+      android: { elevation: 2 },
     }),
   },
-
-  controlButtonIcon: {
-    fontSize: 20,
+  selectorText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
   },
-
+  selectorTextActive: {
+    color: '#6366F1',
+    fontWeight: '700',
+  },
+  activeIndicator: {
+    position: 'absolute',
+    bottom: 2,
+    left: '25%',
+    right: '25%',
+    height: 3,
+    backgroundColor: '#6366F1',
+    borderRadius: 2,
+  },
+  controlButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  controlButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: { elevation: 2 },
+    }),
+  },
+  controlButtonIcon: { fontSize: 20 },
   alertBadge: {
     position: 'absolute',
     top: -4,
@@ -1401,13 +1455,14 @@ const styles = {
     justifyContent: 'center',
     alignItems: 'center',
   },
-
   alertBadgeText: {
     fontSize: 11,
     fontWeight: '700',
     color: '#FFFFFF',
+    paddingHorizontal: 4,
   },
 
+  // View Mode
   viewModeToggle: {
     flexDirection: 'row',
     marginHorizontal: 20,
@@ -1416,14 +1471,12 @@ const styles = {
     borderRadius: 14,
     padding: 4,
   },
-
   viewModeButton: {
     flex: 1,
     paddingVertical: 10,
     alignItems: 'center',
     borderRadius: 10,
   },
-
   viewModeActive: {
     backgroundColor: '#FFFFFF',
     ...Platform.select({
@@ -1433,84 +1486,582 @@ const styles = {
         shadowOpacity: 0.1,
         shadowRadius: 4,
       },
-      android: {
-        elevation: 2,
-      },
+      android: { elevation: 2 },
     }),
   },
-
   viewModeText: {
     fontSize: 13,
     fontWeight: '600',
     color: '#64748B',
   },
-
   viewModeTextActive: {
     color: '#6366F1',
     fontWeight: '700',
   },
 
+  // Hero Card
+  heroCard: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+      },
+      android: { elevation: 4 },
+    }),
+  },
+  heroContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  spotPriceSection: { flex: 1 },
+  indexLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#6366F1',
+    marginBottom: 4,
+  },
+  spotPrice: {
+    fontSize: 36,
+    fontWeight: '900',
+    color: '#0F172A',
+    marginBottom: 8,
+  },
+  liveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+  },
+  liveText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#10B981',
+  },
+  quickStats: {
+    gap: 12,
+    alignItems: 'flex-end',
+  },
+  quickStat: { alignItems: 'flex-end' },
+  quickStatLabel: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  quickStatValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  quickStatDivider: {
+    width: 40,
+    height: 1,
+    backgroundColor: '#E5E7EB',
+  },
   miniChart: {
     marginTop: 16,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(100, 116, 139, 0.1)',
+    borderTopColor: '#E5E7EB',
   },
-
   miniChartTitle: {
     fontSize: 13,
     fontWeight: '600',
     color: '#64748B',
     marginBottom: 12,
   },
-
   chartContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     height: 50,
     gap: 4,
   },
-
   chartBar: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-end',
   },
-
   chartBarFill: {
     width: '100%',
     borderRadius: 2,
     minHeight: 2,
   },
 
+  // Bias Card
+  biasCard: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 2,
+  },
+  biasHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  biasLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  biasEmoji: { fontSize: 32 },
+  biasTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    marginBottom: 4,
+  },
+  confidenceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  confidenceEmoji: { fontSize: 14 },
+  confidenceLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  biasIcon: { fontSize: 40 },
   confidenceBar: {
     height: 4,
     backgroundColor: 'rgba(0, 0, 0, 0.1)',
     borderRadius: 2,
-    marginTop: 12,
     overflow: 'hidden',
   },
-
   confidenceBarFill: {
     height: '100%',
     borderRadius: 2,
   },
+  sentimentMeter: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  meterHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  meterLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  meterPercentage: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  meterBar: {
+    height: 8,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 4,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  meterFillBull: {
+    height: '100%',
+    backgroundColor: '#10B981',
+    position: 'absolute',
+    left: 0,
+  },
+  meterFillBear: {
+    height: '100%',
+    backgroundColor: '#EF4444',
+  },
+  meterLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  meterLabelBull: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#10B981',
+  },
+  meterLabelBear: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#EF4444',
+  },
 
-  // Modal styles
+  // Indicators Grid
+  indicatorsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 20,
+    gap: 12,
+    marginBottom: 20,
+  },
+  indicatorCard: {
+    width: (width - 52) / 2,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: { elevation: 2 },
+    }),
+  },
+  indicatorHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  indicatorIcon: { fontSize: 24 },
+  indicatorBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  indicatorBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  indicatorValue: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#0F172A',
+    marginBottom: 8,
+  },
+  indicatorFooter: { gap: 4 },
+  indicatorLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  indicatorSubtext: {
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  indicatorTag: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  indicatorTagText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
+  // Zone Totals
+  zoneTotalsCard: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: { elevation: 2 },
+    }),
+  },
+  zoneTotalsTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 16,
+  },
+  zoneTotalsGrid: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  zoneTotalItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  zoneTotalLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  zoneTotalValueGreen: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#10B981',
+    marginBottom: 4,
+  },
+  zoneTotalValueRed: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#EF4444',
+    marginBottom: 4,
+  },
+  zoneTotalSub: {
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  zoneTotalDivider: {
+    width: 1,
+    backgroundColor: '#E5E7EB',
+  },
+
+  // Signals
+  signalsCard: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: { elevation: 2 },
+    }),
+  },
+  signalsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  signalsIcon: { fontSize: 24 },
+  signalsTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  signalsList: { gap: 12 },
+  signalItem: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  signalDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#6366F1',
+    marginTop: 6,
+  },
+  signalText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#475569',
+  },
+
+  // Detailed View
+  detailedView: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: { elevation: 2 },
+    }),
+  },
+  detailedTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 8,
+  },
+  detailedSubtext: {
+    fontSize: 14,
+    color: '#64748B',
+  },
+
+  // Zones
+  zoneSection: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+  },
+  zoneSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  zoneHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  zoneEmoji: { fontSize: 24 },
+  zoneTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  zoneBadge: {
+    backgroundColor: '#10B98120',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  resistanceBadge: {
+    backgroundColor: '#EF444420',
+  },
+  zoneBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  zoneCards: { gap: 12 },
+  zoneCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: { elevation: 2 },
+    }),
+  },
+  zoneCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  strikePrice: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  zoneLevel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  strengthBadge: {
+    backgroundColor: '#10B98120',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  resistanceStrengthBadge: {
+    backgroundColor: '#EF444420',
+  },
+  strengthText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  oiRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  oiItem: { flex: 1 },
+  oiLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+    marginBottom: 4,
+  },
+  oiValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  strengthBar: {
+    height: 4,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  strengthFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+
+  // Footer
+  footerInfo: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+  },
+  timestampRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+    justifyContent: 'center',
+  },
+  timestampIcon: { fontSize: 16 },
+  timestampText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  disclaimerBox: {
+    flexDirection: 'row',
+    backgroundColor: '#FEF3C7',
+    padding: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  disclaimerIcon: { fontSize: 16 },
+  disclaimerText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#92400E',
+  },
+
+  // Modals
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'flex-end',
   },
-
   modalContent: {
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
     paddingBottom: 40,
+    maxHeight: '80%',
   },
-
   modalTitle: {
     fontSize: 24,
     fontWeight: '800',
@@ -1518,18 +2069,15 @@ const styles = {
     marginBottom: 24,
     textAlign: 'center',
   },
-
   activeAlerts: {
     marginBottom: 24,
   },
-
   activeAlertsTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: '#0F172A',
     marginBottom: 12,
   },
-
   alertItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1539,23 +2087,17 @@ const styles = {
     borderRadius: 12,
     marginBottom: 8,
   },
-
-  alertInfo: {
-    flex: 1,
-  },
-
+  alertInfo: { flex: 1 },
   alertPrice: {
     fontSize: 18,
     fontWeight: '700',
     color: '#0F172A',
     marginBottom: 4,
   },
-
   alertType: {
     fontSize: 14,
     color: '#64748B',
   },
-
   removeAlertButton: {
     width: 32,
     height: 32,
@@ -1564,24 +2106,20 @@ const styles = {
     justifyContent: 'center',
     alignItems: 'center',
   },
-
   removeAlertText: {
     fontSize: 16,
     color: '#EF4444',
     fontWeight: '700',
   },
-
   addAlertSection: {
     marginBottom: 20,
   },
-
   addAlertTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: '#0F172A',
     marginBottom: 12,
   },
-
   alertOption: {
     backgroundColor: '#F8FAFC',
     padding: 16,
@@ -1590,14 +2128,12 @@ const styles = {
     borderWidth: 2,
     borderColor: '#E5E7EB',
   },
-
   alertOptionText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#0F172A',
     textAlign: 'center',
   },
-
   shareOption: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1606,41 +2142,24 @@ const styles = {
     borderRadius: 12,
     marginBottom: 12,
   },
-
   shareOptionIcon: {
     fontSize: 24,
     marginRight: 16,
   },
-
   shareOptionText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#0F172A',
   },
-
   modalCloseButton: {
     backgroundColor: '#6366F1',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
   },
-
   modalCloseText: {
     fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
   },
-
-  // Keep all original styles...
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8FAFC' },
-  loadingEmoji: { fontSize: 80, marginBottom: 20 },
-  loadingText: { fontSize: 16, color: '#64748B', fontWeight: '600' },
-  errorEmoji: { fontSize: 80, marginBottom: 20 },
-  errorText: { fontSize: 24, fontWeight: '800', color: '#0F172A', marginBottom: 8 },
-  errorSubtext: { fontSize: 16, color: '#64748B', marginBottom: 24 },
-  retryButton: { backgroundColor: '#6366F1', paddingHorizontal: 32, paddingVertical: 14, borderRadius: 12 },
-  retryButtonText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
-  // ... rest of original styles
-};
-
-export default MarketScreen;
+});
