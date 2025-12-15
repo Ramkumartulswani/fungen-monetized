@@ -10,6 +10,7 @@ import {
   Share,
   ScrollView,
   Alert,
+  Platform,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -51,17 +52,31 @@ export default function JokesScreen() {
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const heartAnim = useRef(new Animated.Value(1)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadInitialData();
+    
+    // Start loading animation
+    Animated.loop(
+      Animated.timing(rotateAnim, {
+        toValue: 1,
+        duration: 2000,
+        useNativeDriver: true,
+      })
+    ).start();
   }, []);
 
   useEffect(() => {
-    animateJokeEntry();
+    if (!loading) {
+      animateJokeEntry();
+    }
   }, [index, viewMode]);
 
   useEffect(() => {
-    ensureJokesAvailable();
+    if (!loading) {
+      ensureJokesAvailable();
+    }
   }, [category]);
 
   const loadInitialData = async () => {
@@ -82,7 +97,9 @@ export default function JokesScreen() {
 
       // Load initial jokes
       const initialJokes = await fetchJokesByCategory('ALL');
-      setJokes(initialJokes);
+      if (initialJokes.length > 0) {
+        setJokes(initialJokes);
+      }
       
       setLoading(false);
     } catch (error) {
@@ -142,12 +159,12 @@ export default function JokesScreen() {
           'https://v2.jokeapi.dev/joke/Programming?type=twopart&amount=10&safe-mode'
         );
         const data = await res.json();
-        if (data.jokes) {
+        if (data.jokes && Array.isArray(data.jokes)) {
           fetched = data.jokes.map((j: any) => ({
             id: j.id,
             setup: j.setup,
             punchline: j.delivery,
-            category: 'PROGRAMMING',
+            category: 'PROGRAMMING' as Category,
           }));
         }
       } else if (cat === 'PUNS') {
@@ -155,25 +172,28 @@ export default function JokesScreen() {
           'https://v2.jokeapi.dev/joke/Pun?type=twopart&amount=10&safe-mode'
         );
         const data = await res.json();
-        if (data.jokes) {
+        if (data.jokes && Array.isArray(data.jokes)) {
           fetched = data.jokes.map((j: any) => ({
             id: j.id,
             setup: j.setup,
             punchline: j.delivery,
-            category: 'PUNS',
+            category: 'PUNS' as Category,
           }));
         }
       } else {
+        // Fallback for GENERAL, DAD, and ALL
         const res = await fetch(
           'https://official-joke-api.appspot.com/jokes/general/ten'
         );
         const data = await res.json();
-        fetched = data.map((j: any, idx: number) => ({
-          id: j.id || Date.now() + idx,
-          setup: j.setup,
-          punchline: j.punchline,
-          category: cat === 'DAD' ? 'DAD' : 'GENERAL',
-        }));
+        if (Array.isArray(data)) {
+          fetched = data.map((j: any, idx: number) => ({
+            id: j.id || Date.now() + idx,
+            setup: j.setup,
+            punchline: j.punchline,
+            category: (cat === 'DAD' ? 'DAD' : 'GENERAL') as Category,
+          }));
+        }
       }
 
       return fetched;
@@ -229,6 +249,12 @@ export default function JokesScreen() {
     if (isCurrentlyFavorite) {
       const updated = favorites.filter((f) => f.id !== currentJoke.id);
       saveFavorites(updated);
+      
+      const newStats = {
+        ...stats,
+        favorites: updated.length,
+      };
+      saveStats(newStats);
     } else {
       const updated = [...favorites, { ...currentJoke, isFavorite: true }];
       saveFavorites(updated);
@@ -256,6 +282,9 @@ export default function JokesScreen() {
   const nextJoke = () => {
     setShowPunchline(false);
     const displayJokes = viewMode === 'favorites' ? favorites : filteredJokes;
+    
+    if (displayJokes.length === 0) return;
+    
     setIndex((prev) => (prev + 1) % displayJokes.length);
 
     // Update stats
@@ -270,6 +299,9 @@ export default function JokesScreen() {
   const prevJoke = () => {
     setShowPunchline(false);
     const displayJokes = viewMode === 'favorites' ? favorites : filteredJokes;
+    
+    if (displayJokes.length === 0) return;
+    
     setIndex((prev) => (prev === 0 ? displayJokes.length - 1 : prev - 1));
   };
 
@@ -277,10 +309,13 @@ export default function JokesScreen() {
     setShowPunchline(false);
     
     if (viewMode === 'favorites') {
+      if (favorites.length === 0) return;
       const randomIndex = Math.floor(Math.random() * favorites.length);
       setIndex(randomIndex);
     } else {
       const displayJokes = filteredJokes;
+      if (displayJokes.length === 0) return;
+      
       if (displayJokes.length > 1) {
         let randomIndex;
         do {
@@ -295,16 +330,21 @@ export default function JokesScreen() {
     category === 'ALL' ? jokes : jokes.filter((j) => j.category === category);
 
   const displayJokes = viewMode === 'favorites' ? favorites : filteredJokes;
-  const currentJoke = displayJokes[index] || displayJokes[0];
+  const currentJoke = displayJokes[index];
 
   const isFavorite = currentJoke
     ? favorites.some((f) => f.id === currentJoke.id)
     : false;
 
+  const spin = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
   if (loading) {
     return (
       <View style={styles.center}>
-        <Animated.Text style={[styles.loadingEmoji, { transform: [{ scale: heartAnim }] }]}>
+        <Animated.Text style={[styles.loadingEmoji, { transform: [{ rotate: spin }] }]}>
           😂
         </Animated.Text>
         <ActivityIndicator size="large" color="#6366f1" style={{ marginTop: 16 }} />
@@ -313,14 +353,25 @@ export default function JokesScreen() {
     );
   }
 
-  if (!currentJoke) {
+  if (!currentJoke || displayJokes.length === 0) {
     return (
       <View style={styles.center}>
         <Text style={styles.emptyEmoji}>😅</Text>
-        <Text style={styles.emptyText}>No jokes available</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={loadInitialData}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
+        <Text style={styles.emptyText}>
+          {viewMode === 'favorites' 
+            ? 'No favorites yet' 
+            : 'No jokes available'}
+        </Text>
+        <Text style={styles.emptySubtext}>
+          {viewMode === 'favorites'
+            ? 'Start adding jokes to your favorites!'
+            : 'Try selecting a different category'}
+        </Text>
+        {viewMode !== 'favorites' && (
+          <TouchableOpacity style={styles.retryButton} onPress={loadInitialData}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   }
@@ -465,9 +516,13 @@ export default function JokesScreen() {
 
           {/* NAVIGATION */}
           <View style={styles.navigation}>
-            <TouchableOpacity style={styles.navButton} onPress={prevJoke}>
-              <Text style={styles.navArrow}>←</Text>
-              <Text style={styles.navText}>Previous</Text>
+            <TouchableOpacity 
+              style={[styles.navButton, displayJokes.length <= 1 && styles.navButtonDisabled]} 
+              onPress={prevJoke}
+              disabled={displayJokes.length <= 1}
+            >
+              <Text style={[styles.navArrow, displayJokes.length <= 1 && styles.navTextDisabled]}>←</Text>
+              <Text style={[styles.navText, displayJokes.length <= 1 && styles.navTextDisabled]}>Previous</Text>
             </TouchableOpacity>
 
             <View style={styles.counter}>
@@ -479,9 +534,13 @@ export default function JokesScreen() {
               </Text>
             </View>
 
-            <TouchableOpacity style={styles.navButton} onPress={nextJoke}>
-              <Text style={styles.navText}>Next</Text>
-              <Text style={styles.navArrow}>→</Text>
+            <TouchableOpacity 
+              style={[styles.navButton, displayJokes.length <= 1 && styles.navButtonDisabled]} 
+              onPress={nextJoke}
+              disabled={displayJokes.length <= 1}
+            >
+              <Text style={[styles.navText, displayJokes.length <= 1 && styles.navTextDisabled]}>Next</Text>
+              <Text style={[styles.navArrow, displayJokes.length <= 1 && styles.navTextDisabled]}>→</Text>
             </TouchableOpacity>
           </View>
 
@@ -531,6 +590,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f8fafc',
+    paddingHorizontal: 20,
   },
 
   loadingEmoji: {
@@ -550,10 +610,18 @@ const styles = StyleSheet.create({
   },
 
   emptyText: {
-    fontSize: 18,
+    fontSize: 20,
     color: '#334155',
-    fontWeight: '600',
+    fontWeight: '700',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+
+  emptySubtext: {
+    fontSize: 14,
+    color: '#64748b',
     marginBottom: 24,
+    textAlign: 'center',
   },
 
   retryButton: {
@@ -571,7 +639,7 @@ const styles = StyleSheet.create({
 
   header: {
     padding: 30,
-    paddingTop: 60,
+    paddingTop: Platform.OS === 'ios' ? 60 : 30,
     paddingBottom: 24,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
@@ -636,11 +704,17 @@ const styles = StyleSheet.create({
 
   modeButtonActive: {
     backgroundColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
 
   modeText: {
@@ -656,11 +730,11 @@ const styles = StyleSheet.create({
 
   categoriesScroll: {
     maxHeight: 50,
+    marginBottom: 16,
   },
 
   categoriesContent: {
     paddingHorizontal: 20,
-    gap: 10,
   },
 
   categoryChip: {
@@ -698,11 +772,17 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     minHeight: 320,
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 5,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
   },
 
   categoryBadge: {
@@ -802,12 +882,22 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 2,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
     gap: 8,
+  },
+
+  navButtonDisabled: {
+    opacity: 0.5,
   },
 
   navArrow: {
@@ -820,6 +910,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#6366f1',
     fontWeight: '600',
+  },
+
+  navTextDisabled: {
+    color: '#94a3b8',
   },
 
   counter: {
@@ -866,11 +960,17 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     marginTop: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
 
   statsCardTitle: {
