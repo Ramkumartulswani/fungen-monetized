@@ -85,9 +85,9 @@ android {
     signingConfigs {
     release {
         storeFile file("fungen-release.keystore")
-        storePassword "YOUR_STORE_PASSWORD"
-        keyAlias "fungen"
-        keyPassword "YOUR_KEY_PASSWORD"
+        storePassword "Fungen@2025"
+        keyAlias "fungen-release"
+        keyPassword "Fungen@2025"
     }
     }
 
