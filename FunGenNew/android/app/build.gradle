@@ -79,18 +79,18 @@ android {
         applicationId "com.fungen.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 5
-        versionName "1.0.6"
+        versionCode 6
+        versionName "1.0.7"
     }
     signingConfigs {
     release {
-        storeFile file(FUNGEN_UPLOAD_STORE_FILE)
-        storePassword FUNGEN_UPLOAD_STORE_PASSWORD
-        keyAlias FUNGEN_UPLOAD_KEY_ALIAS
-        keyPassword FUNGEN_UPLOAD_KEY_PASSWORD
+        storeFile file("fungen-release.keystore")
+        storePassword project.findProperty("FUNGGEN_STORE_PASSWORD")
+        keyAlias project.findProperty("FUNGGEN_KEY_ALIAS")
+        keyPassword project.findProperty("FUNGGEN_KEY_PASSWORD")
     }
     }
-
+    
     buildTypes {
         release {
             signingConfig signingConfigs.release
@@ -98,6 +98,7 @@ android {
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
     }
+
 
     applicationVariants.all { variant ->
     variant.outputs.all { output ->
