@@ -84,12 +84,13 @@ android {
     }
     signingConfigs {
     release {
-        storeFile file("fungen-release.keystore")
-        storePassword project.findProperty("FUNGGEN_STORE_PASSWORD")
-        keyAlias project.findProperty("FUNGGEN_KEY_ALIAS")
-        keyPassword project.findProperty("FUNGGEN_KEY_PASSWORD")
+        storeFile file(project.property("FUNGEN_UPLOAD_STORE_FILE"))
+        storePassword project.property("FUNGEN_UPLOAD_STORE_PASSWORD")
+        keyAlias project.property("FUNGEN_UPLOAD_KEY_ALIAS")
+        keyPassword project.property("FUNGEN_UPLOAD_KEY_PASSWORD")
     }
     }
+
     
     buildTypes {
         release {
@@ -99,14 +100,6 @@ android {
         }
     }
 
-
-    applicationVariants.all { variant ->
-    variant.outputs.all { output ->
-        def appName = "FunGen"
-        def versionName = variant.versionName
-        outputFileName = "${appName}-${versionName}.apk"
-    }
-}
 
 }
 
