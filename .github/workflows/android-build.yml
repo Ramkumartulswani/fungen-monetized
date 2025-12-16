@@ -58,30 +58,27 @@ jobs:
             "cmdline-tools;latest"
 
       # -------------------------
-      # Keystore (temporary)
+      # RESTORE REAL RELEASE KEYSTORE (FROM SECRETS)
       # -------------------------
-      - name: Generate temporary release keystore
+      - name: Restore release keystore
         run: |
-          keytool -genkeypair -v \
-            -storetype PKCS12 \
-            -keystore FunGenNew/android/app/release.keystore \
-            -alias fungentest \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -storepass 123456 \
-            -keypass 123456 \
-            -dname "CN=FunGen, OU=Dev, O=FunGen, L=Mumbai, ST=MH, C=IN"
+          echo "${{ secrets.FUNGEN_KEYSTORE_BASE64 }}" | base64 --decode > FunGenNew/android/app/fungen-release.keystore
+
+      # -------------------------
+      # INJECT SIGNING CONFIG (NO HARD CODING)
+      # -------------------------
+      - name: Configure signing properties
+        run: |
+          echo "FUNGEN_UPLOAD_STORE_FILE=fungen-release.keystore" >> FunGenNew/android/gradle.properties
+          echo "FUNGEN_UPLOAD_KEY_ALIAS=${{ secrets.FUNGEN_KEY_ALIAS }}" >> FunGenNew/android/gradle.properties
+          echo "FUNGEN_UPLOAD_STORE_PASSWORD=${{ secrets.FUNGEN_STORE_PASSWORD }}" >> FunGenNew/android/gradle.properties
+          echo "FUNGEN_UPLOAD_KEY_PASSWORD=${{ secrets.FUNGEN_KEY_PASSWORD }}" >> FunGenNew/android/gradle.properties
 
       # -------------------------
       # Build APK + AAB
       # -------------------------
       - name: Build Release APK and AAB
         working-directory: FunGenNew/android
-        env:
-          KEYSTORE_PASSWORD: 123456
-          KEY_ALIAS: fungentest
-          KEY_PASSWORD: 123456
         run: |
           chmod +x gradlew
           ./gradlew clean
@@ -104,4 +101,3 @@ jobs:
           name: FunGenNew-AAB
           path: FunGenNew/android/app/build/outputs/bundle/release/*.aab
           retention-days: 30
-
