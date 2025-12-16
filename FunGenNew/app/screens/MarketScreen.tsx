@@ -43,8 +43,8 @@ export default function MarketScreen() {
       const res = await fetch(url);
       const json = await res.json();
       setData(json);
-    } catch (err) {
-      console.error('Fetch error:', err);
+    } catch (e) {
+      console.error(e);
       setError(true);
     } finally {
       setLoading(false);
@@ -61,7 +61,7 @@ export default function MarketScreen() {
       maximumFractionDigits: 2,
     }).format(price);
 
-  /* -------------------- LOADING -------------------- */
+  /* ---------- LOADING ---------- */
   if (loading) {
     return (
       <View style={styles.center}>
@@ -72,7 +72,7 @@ export default function MarketScreen() {
     );
   }
 
-  /* -------------------- ERROR -------------------- */
+  /* ---------- ERROR ---------- */
   if (error || !data) {
     return (
       <View style={styles.center}>
@@ -110,10 +110,10 @@ export default function MarketScreen() {
           <Text style={styles.headerSubtitle}>Live Options Analysis</Text>
         </View>
 
-        {/* PAYWALL ENTRY (SAFE & EXPLICIT) */}
+        {/* MARKET PRO CTA (SAFE) */}
         <TouchableOpacity
-          onPress={() => navigation.navigate('MarketPaywall' as never)}
           style={styles.proBanner}
+          onPress={() => navigation.navigate('MarketPaywall' as never)}
         >
           <Text style={styles.proText}>
             ⭐ Unlock Market Pro – ₹49 / month
@@ -143,6 +143,29 @@ export default function MarketScreen() {
           ))}
         </View>
 
+        {/* VIEW MODE */}
+        <View style={styles.viewModeToggle}>
+          {['overview', 'detailed', 'zones'].map(mode => (
+            <TouchableOpacity
+              key={mode}
+              style={[
+                styles.viewModeButton,
+                viewMode === mode && styles.viewModeActive,
+              ]}
+              onPress={() => setViewMode(mode as any)}
+            >
+              <Text
+                style={[
+                  styles.viewModeText,
+                  viewMode === mode && styles.viewModeTextActive,
+                ]}
+              >
+                {mode.toUpperCase()}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         {/* PRICE CARD */}
         <View style={styles.card}>
           <Text style={styles.indexLabel}>{data.index}</Text>
@@ -156,6 +179,9 @@ export default function MarketScreen() {
         <View style={[styles.biasCard, { borderColor: biasColor }]}>
           <Text style={styles.biasEmoji}>{biasEmoji}</Text>
           <Text style={[styles.biasTitle, { color: biasColor }]}>{bias}</Text>
+          <Text style={styles.confidenceText}>
+            {data.final_decision.confidence} CONFIDENCE
+          </Text>
         </View>
 
         {/* OVERVIEW */}
@@ -171,7 +197,7 @@ export default function MarketScreen() {
         <View style={styles.footer}>
           <Text style={styles.timestamp}>{data.timestamp}</Text>
           <Text style={styles.disclaimer}>
-            ⚠️ Educational purpose only
+            ⚠️ Educational purpose only. Not financial advice.
           </Text>
         </View>
 
@@ -181,7 +207,7 @@ export default function MarketScreen() {
   );
 }
 
-/* -------------------- STYLES -------------------- */
+/* ---------- STYLES ---------- */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -221,6 +247,18 @@ const styles = StyleSheet.create({
   selectorActive: { backgroundColor: '#fff', borderRadius: 8 },
   selectorText: { color: '#64748B' },
   selectorTextActive: { color: '#6366F1', fontWeight: '700' },
+  viewModeToggle: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 4,
+  },
+  viewModeButton: { flex: 1, padding: 8, alignItems: 'center' },
+  viewModeActive: { backgroundColor: '#fff', borderRadius: 8 },
+  viewModeText: { fontSize: 12, color: '#64748B' },
+  viewModeTextActive: { color: '#6366F1', fontWeight: '700' },
   card: {
     margin: 16,
     backgroundColor: '#fff',
@@ -240,6 +278,7 @@ const styles = StyleSheet.create({
   },
   biasEmoji: { fontSize: 32 },
   biasTitle: { fontSize: 22, fontWeight: '900' },
+  confidenceText: { color: '#64748B', fontWeight: '700' },
   section: { margin: 16 },
   sectionTitle: { fontSize: 18, fontWeight: '800' },
   footer: { margin: 16 },
