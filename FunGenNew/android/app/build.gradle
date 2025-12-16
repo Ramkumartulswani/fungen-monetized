@@ -85,19 +85,20 @@ android {
     signingConfigs {
     release {
         storeFile file("fungen-release.keystore")
-        storePassword "Fungen@2025"
-        keyAlias "fungen-release"
-        keyPassword "Fungen@2025"
+        storePassword project.findProperty("FUNGGEN_STORE_PASSWORD")
+        keyAlias project.findProperty("FUNGGEN_KEY_ALIAS")
+        keyPassword project.findProperty("FUNGGEN_KEY_PASSWORD")
     }
+    }
+    
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+        }
     }
 
-    buildTypes {
-    release {
-        signingConfig signingConfigs.release
-        minifyEnabled false
-        proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
-    }
-    }
 
     applicationVariants.all { variant ->
     variant.outputs.all { output ->
