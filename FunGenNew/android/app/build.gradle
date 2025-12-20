@@ -41,18 +41,26 @@ android {
         }
 
         release {
-            // ✅ DO NOT TOUCH signingConfigs directly
-            signingConfig signingConfigs.release
+            if (signingConfigs.release.storeFile != null) {
+                signingConfig signingConfigs.release
+            }
+
             minifyEnabled false
             proguardFiles getDefaultProguardFile(
                 "proguard-android.txt"
             ), "proguard-rules.pro"
         }
+
     }
 }
 
 dependencies {
+    // 🔹 Firebase BOM (you can keep this version or update later)
     implementation platform("com.google.firebase:firebase-bom:32.7.0")
+
+    // ✅ ADD THIS LINE (REQUIRED)
+    implementation "com.google.firebase:firebase-config"
+
     implementation("com.facebook.react:react-android")
     implementation("com.facebook.react:flipper-integration")
 
@@ -62,6 +70,7 @@ dependencies {
         implementation jscFlavor
     }
 }
+
 
 apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle")
 applyNativeModulesAppBuildGradle(project)

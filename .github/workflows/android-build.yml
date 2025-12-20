@@ -70,7 +70,7 @@ jobs:
       # -------------------------
       - name: Configure signing properties
         run: |
-          echo "FUNGEN_UPLOAD_STORE_FILE=fungen-release.keystore" >> FunGenNew/android/gradle.properties
+          echo "FUNGEN_UPLOAD_STORE_FILE=app/fungen-release.keystore" >> FunGenNew/android/gradle.properties
           echo "FUNGEN_UPLOAD_KEY_ALIAS=${{ secrets.FUNGEN_KEY_ALIAS }}" >> FunGenNew/android/gradle.properties
           echo "FUNGEN_UPLOAD_STORE_PASSWORD=${{ secrets.FUNGEN_STORE_PASSWORD }}" >> FunGenNew/android/gradle.properties
           echo "FUNGEN_UPLOAD_KEY_PASSWORD=${{ secrets.FUNGEN_KEY_PASSWORD }}" >> FunGenNew/android/gradle.properties
@@ -80,11 +80,17 @@ jobs:
       # -------------------------
       - name: Build Release APK and AAB
         working-directory: FunGenNew/android
+        env:
+            FUNGEN_UPLOAD_STORE_FILE: app/fungen-release.keystore
+            FUNGEN_UPLOAD_STORE_PASSWORD: ${{ secrets.FUNGEN_STORE_PASSWORD }}
+            FUNGEN_UPLOAD_KEY_ALIAS: ${{ secrets.FUNGEN_KEY_ALIAS }}
+            FUNGEN_UPLOAD_KEY_PASSWORD: ${{ secrets.FUNGEN_KEY_PASSWORD }}
         run: |
-          chmod +x gradlew
-          ./gradlew clean
-          ./gradlew assembleRelease
-          ./gradlew bundleRelease
+            chmod +x gradlew
+            ./gradlew clean
+            ./gradlew assembleRelease
+            ./gradlew bundleRelease
+
 
       # -------------------------
       # Upload artifacts
