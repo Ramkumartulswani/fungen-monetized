@@ -11,8 +11,12 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
+
 // ✅ NEW (SAFE): Feature flags helper
 import { getFeatureFlags } from '../utils/featureFlags'; // adjust path if needed
+
+const [showProBanner, setShowProBanner] = useState(true);
+
 
 const MARKET_URLS: any = {
   NIFTY:
@@ -42,15 +46,16 @@ export default function MarketScreen() {
 
   /* ---------- NEW EFFECT (SAFE / OBSERVE ONLY) ---------- */
   useEffect(() => {
-    (async () => {
-      try {
-        const flags = await getFeatureFlags();
-        console.log('[MarketScreen FeatureFlags]', flags);
-      } catch {
-        // silent – no behavior change
-      }
-    })();
-  }, []);
+  (async () => {
+    try {
+      const flags = await getFeatureFlags();
+      setShowProBanner(flags.showMarketProBanner);
+    } catch {
+      // ignore
+    }
+  })();
+}, []);
+
 
   const fetchMarketData = async () => {
     try {
@@ -127,14 +132,17 @@ export default function MarketScreen() {
         </View>
 
         {/* MARKET PRO CTA (UNCHANGED) */}
-        <TouchableOpacity
-          style={styles.proBanner}
-          onPress={() => navigation.navigate('MarketPaywall' as never)}
-        >
-          <Text style={styles.proText}>
-            ⭐ Unlock Market Pro – ₹49 / month
-          </Text>
-        </TouchableOpacity>
+        {showProBanner && (
+          <TouchableOpacity
+            style={styles.proBanner}
+            onPress={() => navigation.navigate('MarketPaywall' as never)}
+          >
+            <Text style={styles.proText}>
+              ⭐ Unlock Market Pro – ₹49 / month
+            </Text>
+          </TouchableOpacity>
+        )}
+
 
         {/* INDEX SELECTOR */}
         <View style={styles.selectorContainer}>
