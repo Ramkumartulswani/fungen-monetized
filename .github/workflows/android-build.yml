@@ -70,7 +70,7 @@ jobs:
       # -------------------------
       - name: Configure signing properties
         run: |
-          echo "FUNGEN_UPLOAD_STORE_FILE=fungen-release.keystore" >> FunGenNew/android/gradle.properties
+          echo "FUNGEN_UPLOAD_STORE_FILE=app/fungen-release.keystore" >> FunGenNew/android/gradle.properties
           echo "FUNGEN_UPLOAD_KEY_ALIAS=${{ secrets.FUNGEN_KEY_ALIAS }}" >> FunGenNew/android/gradle.properties
           echo "FUNGEN_UPLOAD_STORE_PASSWORD=${{ secrets.FUNGEN_STORE_PASSWORD }}" >> FunGenNew/android/gradle.properties
           echo "FUNGEN_UPLOAD_KEY_PASSWORD=${{ secrets.FUNGEN_KEY_PASSWORD }}" >> FunGenNew/android/gradle.properties
