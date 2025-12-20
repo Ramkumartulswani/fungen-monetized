@@ -1,4 +1,5 @@
 package com.fungennew
+import com.google.firebase.FirebaseApp
 
 import android.app.Application
 import com.facebook.react.PackageList
@@ -36,6 +37,8 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
+    // ✅ REQUIRED: Initialize Firebase BEFORE anything uses it
+    FirebaseApp.initializeApp(this)
     SoLoader.init(this, false)
     if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
       load()
