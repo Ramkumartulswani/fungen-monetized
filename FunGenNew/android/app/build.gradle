@@ -1,6 +1,7 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+apply plugin: "com.google.gms.google-services"
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -83,27 +84,46 @@ android {
         versionName "1.0.8"
     }
     signingConfigs {
-    release {
-        storeFile file(project.property("FUNGEN_UPLOAD_STORE_FILE"))
-        storePassword project.property("FUNGEN_UPLOAD_STORE_PASSWORD")
-        keyAlias project.property("FUNGEN_UPLOAD_KEY_ALIAS")
-        keyPassword project.property("FUNGEN_UPLOAD_KEY_PASSWORD")
-    }
-    }
-
-    
-    buildTypes {
-        release {
-            signingConfig signingConfigs.release
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+            release {
+                def storeFilePath = project.findProperty("FUNGEN_UPLOAD_STORE_FILE")
+                def storePasswordVal = project.findProperty("FUNGEN_UPLOAD_STORE_PASSWORD")
+                def keyAliasVal = project.findProperty("FUNGEN_UPLOAD_KEY_ALIAS")
+                def keyPasswordVal = project.findProperty("FUNGEN_UPLOAD_KEY_PASSWORD")
+        
+                if (storeFilePath != null) {
+                    storeFile file(storeFilePath)
+                    storePassword storePasswordVal
+                    keyAlias keyAliasVal
+                    keyPassword keyPasswordVal
+                }
+                // ❌ No else block
+                // ❌ No debug.keystore
+                // ❌ No local signing
+            }
         }
-    }
+
+        
+        buildTypes {
+            debug {
+                // No signing config needed
+            }
+        
+            release {
+                if (signingConfigs.release.storeFile != null) {
+                    signingConfig signingConfigs.release
+                }
+                minifyEnabled false
+                proguardFiles getDefaultProguardFile(
+                    "proguard-android.txt"
+                ), "proguard-rules.pro"
+            }
+        }
 
 
 }
 
 dependencies {
+    implementation platform("com.google.firebase:firebase-bom:32.7.0")
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
     implementation("com.facebook.react:flipper-integration")
