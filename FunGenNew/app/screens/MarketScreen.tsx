@@ -11,6 +11,9 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
+// ✅ NEW (SAFE): Feature flags helper
+import { getFeatureFlags } from '../utils/featureFlags'; // adjust path if needed
+
 const MARKET_URLS: any = {
   NIFTY:
     'https://drive.google.com/uc?export=download&id=1t9fYO6ry9igdt3DZqlBqakMArBA4CdUK',
@@ -32,9 +35,22 @@ export default function MarketScreen() {
     'overview'
   );
 
+  /* ---------- EXISTING EFFECT (UNCHANGED) ---------- */
   useEffect(() => {
     fetchMarketData();
   }, [selectedIndex]);
+
+  /* ---------- NEW EFFECT (SAFE / OBSERVE ONLY) ---------- */
+  useEffect(() => {
+    (async () => {
+      try {
+        const flags = await getFeatureFlags();
+        console.log('[MarketScreen FeatureFlags]', flags);
+      } catch {
+        // silent – no behavior change
+      }
+    })();
+  }, []);
 
   const fetchMarketData = async () => {
     try {
@@ -110,7 +126,7 @@ export default function MarketScreen() {
           <Text style={styles.headerSubtitle}>Live Options Analysis</Text>
         </View>
 
-        {/* MARKET PRO CTA (SAFE) */}
+        {/* MARKET PRO CTA (UNCHANGED) */}
         <TouchableOpacity
           style={styles.proBanner}
           onPress={() => navigation.navigate('MarketPaywall' as never)}
