@@ -84,31 +84,41 @@ android {
         versionName "1.0.8"
     }
     signingConfigs {
-        release {
-            // Only configured in CI
-            if (project.hasProperty("FUNGEN_UPLOAD_STORE_FILE")) {
-                storeFile file(project.property("FUNGEN_UPLOAD_STORE_FILE"))
-                storePassword project.property("FUNGEN_UPLOAD_STORE_PASSWORD")
-                keyAlias project.property("FUNGEN_UPLOAD_KEY_ALIAS")
-                keyPassword project.property("FUNGEN_UPLOAD_KEY_PASSWORD")
+            release {
+                def storeFilePath = project.findProperty("FUNGEN_UPLOAD_STORE_FILE")
+                def storePasswordVal = project.findProperty("FUNGEN_UPLOAD_STORE_PASSWORD")
+                def keyAliasVal = project.findProperty("FUNGEN_UPLOAD_KEY_ALIAS")
+                def keyPasswordVal = project.findProperty("FUNGEN_UPLOAD_KEY_PASSWORD")
+        
+                if (storeFilePath != null) {
+                    storeFile file(storeFilePath)
+                    storePassword storePasswordVal
+                    keyAlias keyAliasVal
+                    keyPassword keyPasswordVal
+                }
+                // ❌ No else block
+                // ❌ No debug.keystore
+                // ❌ No local signing
             }
         }
-        }
+
         
         buildTypes {
             debug {
-                // Debug builds do NOT require signing config
+                // No signing config needed
             }
         
             release {
-                // Only sign when keystore is provided (CI)
                 if (signingConfigs.release.storeFile != null) {
                     signingConfig signingConfigs.release
                 }
                 minifyEnabled false
-                proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+                proguardFiles getDefaultProguardFile(
+                    "proguard-android.txt"
+                ), "proguard-rules.pro"
             }
         }
+
 
 }
 
