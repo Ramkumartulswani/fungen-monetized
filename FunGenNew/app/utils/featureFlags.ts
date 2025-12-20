@@ -5,6 +5,7 @@ type FeatureFlags = {
   premiumEnabled: boolean;
   maxFreeUses: number;
   showUpgradeBanner: boolean;
+  showMarketProBanner: boolean; // 👈 NEW
 };
 
 const defaultFlags: FeatureFlags = {
@@ -12,7 +13,9 @@ const defaultFlags: FeatureFlags = {
   premiumEnabled: true,
   maxFreeUses: 5,
   showUpgradeBanner: false,
+  showMarketProBanner: true, // 👈 DEFAULT = existing behaviour
 };
+
 
 export async function getFeatureFlags(): Promise<FeatureFlags> {
   if (Platform.OS !== 'android') {
@@ -21,7 +24,13 @@ export async function getFeatureFlags(): Promise<FeatureFlags> {
 
   try {
     const nativeFlags = await NativeModules.FeatureFlags?.getFlags?.();
-    return { ...defaultFlags, ...nativeFlags };
+    return {
+  ...defaultFlags,
+  ...nativeFlags,
+  showMarketProBanner:
+    nativeFlags?.showMarketProBanner ?? true,
+};
+
   } catch (e) {
     return defaultFlags;
   }

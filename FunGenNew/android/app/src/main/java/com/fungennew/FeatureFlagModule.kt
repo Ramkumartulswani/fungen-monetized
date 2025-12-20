@@ -14,6 +14,7 @@ class FeatureFlagModule(
     @ReactMethod
     fun getFlags(promise: com.facebook.react.bridge.Promise) {
         val map = WritableNativeMap()
+        map.putBoolean("showMarketProBanner",FeatureFlags.SHOW_UPGRADE_BANNER)
         map.putBoolean("paywallEnabled", FeatureFlags.PAYWALL_ENABLED)
         map.putBoolean("premiumEnabled", FeatureFlags.PREMIUM_ENABLED)
         map.putInt("maxFreeUses", FeatureFlags.MAX_FREE_USES)
