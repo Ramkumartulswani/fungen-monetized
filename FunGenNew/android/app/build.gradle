@@ -41,13 +41,16 @@ android {
         }
 
         release {
-            // ✅ DO NOT TOUCH signingConfigs directly
-            signingConfig signingConfigs.release
+            if (signingConfigs.release.storeFile != null) {
+                signingConfig signingConfigs.release
+            }
+
             minifyEnabled false
             proguardFiles getDefaultProguardFile(
                 "proguard-android.txt"
             ), "proguard-rules.pro"
         }
+
     }
 }
 
