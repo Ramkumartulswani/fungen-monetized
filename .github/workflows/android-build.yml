@@ -63,6 +63,17 @@ jobs:
         run: |
           echo "${{ secrets.FUNGEN_KEYSTORE_BASE64 }}" | base64 --decode > FunGenNew/android/app/fungen-release.keystore
 
+
+      - name: Prepare Gradle signing config
+        run: |
+          cat > FunGenNew/android/gradle.properties <<EOF
+          FUNGEN_UPLOAD_STORE_FILE=fungen-release.keystore
+          FUNGEN_UPLOAD_STORE_PASSWORD=${{ secrets.FUNGEN_STORE_PASSWORD }}
+          FUNGEN_UPLOAD_KEY_ALIAS=${{ secrets.FUNGEN_KEY_ALIAS }}
+          FUNGEN_UPLOAD_KEY_PASSWORD=${{ secrets.FUNGEN_KEY_PASSWORD }}
+          EOF
+
+
       # -------------------------
       # Build APK + AAB (SIGNED)
       # -------------------------
