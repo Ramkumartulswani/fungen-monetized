@@ -3,9 +3,7 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 apply plugin: "com.google.gms.google-services"
 
-react {
-    // default RN config
-}
+react {}
 
 def jscFlavor = 'org.webkit:android-jsc:+'
 
@@ -24,31 +22,27 @@ android {
         versionName "1.0.8"
     }
 
+    // ✅ SAFE SIGNING CONFIG
     signingConfigs {
         release {
             def storeFilePath = project.findProperty("FUNGEN_UPLOAD_STORE_FILE")
-            def storePasswordVal = project.findProperty("FUNGEN_UPLOAD_STORE_PASSWORD")
-            def keyAliasVal = project.findProperty("FUNGEN_UPLOAD_KEY_ALIAS")
-            def keyPasswordVal = project.findProperty("FUNGEN_UPLOAD_KEY_PASSWORD")
-
             if (storeFilePath != null) {
                 storeFile file(storeFilePath)
-                storePassword storePasswordVal
-                keyAlias keyAliasVal
-                keyPassword keyPasswordVal
+                storePassword project.findProperty("FUNGEN_UPLOAD_STORE_PASSWORD")
+                keyAlias project.findProperty("FUNGEN_UPLOAD_KEY_ALIAS")
+                keyPassword project.findProperty("FUNGEN_UPLOAD_KEY_PASSWORD")
             }
         }
     }
 
     buildTypes {
         debug {
-            // no signing
+            // ❌ NO signingConfig here
         }
 
         release {
-            if (signingConfigs.release.storeFile != null) {
-                signingConfig signingConfigs.release
-            }
+            // ✅ DO NOT TOUCH signingConfigs directly
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile(
                 "proguard-android.txt"
@@ -59,7 +53,6 @@ android {
 
 dependencies {
     implementation platform("com.google.firebase:firebase-bom:32.7.0")
-
     implementation("com.facebook.react:react-android")
     implementation("com.facebook.react:flipper-integration")
 
