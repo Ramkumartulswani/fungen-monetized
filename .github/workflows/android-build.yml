@@ -66,12 +66,15 @@ jobs:
 
       - name: Prepare Gradle signing config
         run: |
-          cat > FunGenNew/android/gradle.properties <<EOF
+          cat >> FunGenNew/android/gradle.properties <<EOF
+      
+          # --- Signing config injected by CI ---
           FUNGEN_UPLOAD_STORE_FILE=fungen-release.keystore
           FUNGEN_UPLOAD_STORE_PASSWORD=${{ secrets.FUNGEN_STORE_PASSWORD }}
           FUNGEN_UPLOAD_KEY_ALIAS=${{ secrets.FUNGEN_KEY_ALIAS }}
           FUNGEN_UPLOAD_KEY_PASSWORD=${{ secrets.FUNGEN_KEY_PASSWORD }}
           EOF
+
 
 
       # -------------------------
