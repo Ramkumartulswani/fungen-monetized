@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
-// ✅ Feature flags (safe wrapper)
+// Feature flags
 import { getFeatureFlags } from '../utils/featureFlags';
 
 const MARKET_URLS: any = {
@@ -32,13 +32,11 @@ export default function MarketScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
 
-  const [selectedIndex, setSelectedIndex] = useState<'NIFTY' | 'BANKNIFTY'>(
-    'NIFTY'
-  );
+  const [selectedIndex, setSelectedIndex] =
+    useState<'NIFTY' | 'BANKNIFTY'>('NIFTY');
 
-  const [viewMode, setViewMode] = useState<
-    'overview' | 'detailed' | 'zones'
-  >('overview');
+  const [viewMode, setViewMode] =
+    useState<'overview' | 'zones'>('overview');
 
   /* ---------------- FETCH DATA ---------------- */
   useEffect(() => {
@@ -48,18 +46,14 @@ export default function MarketScreen() {
   /* ---------------- FEATURE FLAGS ---------------- */
   useEffect(() => {
     let mounted = true;
-
     (async () => {
       try {
         const flags = await getFeatureFlags();
         if (mounted) {
           setShowProBanner(flags.showMarketProBanner);
         }
-      } catch {
-        // fail silently
-      }
+      } catch {}
     })();
-
     return () => {
       mounted = false;
     };
@@ -113,8 +107,11 @@ export default function MarketScreen() {
 
   const bias = data.final_decision.bias;
   const biasColor =
-    bias === 'BULLISH' ? '#10B981' : bias === 'BEARISH' ? '#EF4444' : '#6B7280';
-  const biasEmoji = bias === 'BULLISH' ? '🐂' : bias === 'BEARISH' ? '🐻' : '⚖️';
+    bias === 'BULLISH' ? '#10B981' :
+    bias === 'BEARISH' ? '#EF4444' : '#6B7280';
+  const biasEmoji =
+    bias === 'BULLISH' ? '🐂' :
+    bias === 'BEARISH' ? '🐻' : '⚖️';
 
   return (
     <View style={styles.container}>
@@ -136,7 +133,7 @@ export default function MarketScreen() {
           <Text style={styles.headerSubtitle}>Live Options Analysis</Text>
         </View>
 
-        {/* MARKET PRO BANNER */}
+        {/* PRO BANNER */}
         {showProBanner && (
           <TouchableOpacity
             style={styles.proBanner}
@@ -206,7 +203,9 @@ export default function MarketScreen() {
         {/* BIAS */}
         <View style={[styles.biasCard, { borderColor: biasColor }]}>
           <Text style={styles.biasEmoji}>{biasEmoji}</Text>
-          <Text style={[styles.biasTitle, { color: biasColor }]}>{bias}</Text>
+          <Text style={[styles.biasTitle, { color: biasColor }]}>
+            {bias}
+          </Text>
           <Text style={styles.confidenceText}>
             {data.final_decision.confidence} CONFIDENCE
           </Text>
@@ -227,22 +226,42 @@ export default function MarketScreen() {
             <Text style={styles.sectionTitle}>📍 Option Zones</Text>
 
             <Text style={styles.zoneHeader}>🟢 Support Zones</Text>
-            {data.zones?.support?.length > 0 ? (
+            {data.zones?.support?.length ? (
               data.zones.support.map((z: any, i: number) => (
-                <Text key={`sup-${i}`} style={styles.zoneItem}>
-                  {z.strike} • {z.strength}
-                </Text>
+                <View key={`sup-${i}`} style={styles.zoneRow}>
+                  <Text style={styles.zoneStrike}>Strike {z.strike}</Text>
+                  <Text style={styles.zoneMeta}>
+                    PUT OI: {z.put_oi.toLocaleString()} (
+                    {z.put_oi_change >= 0 ? '+' : ''}
+                    {z.put_oi_change.toLocaleString()})
+                  </Text>
+                  <Text style={styles.zoneMeta}>
+                    CALL OI: {z.call_oi.toLocaleString()} (
+                    {z.call_oi_change >= 0 ? '+' : ''}
+                    {z.call_oi_change.toLocaleString()})
+                  </Text>
+                </View>
               ))
             ) : (
               <Text style={styles.muted}>No support zones available</Text>
             )}
 
             <Text style={styles.zoneHeader}>🔴 Resistance Zones</Text>
-            {data.zones?.resistance?.length > 0 ? (
+            {data.zones?.resistance?.length ? (
               data.zones.resistance.map((z: any, i: number) => (
-                <Text key={`res-${i}`} style={styles.zoneItem}>
-                  {z.strike} • {z.strength}
-                </Text>
+                <View key={`res-${i}`} style={styles.zoneRow}>
+                  <Text style={styles.zoneStrike}>Strike {z.strike}</Text>
+                  <Text style={styles.zoneMeta}>
+                    CALL OI: {z.call_oi.toLocaleString()} (
+                    {z.call_oi_change >= 0 ? '+' : ''}
+                    {z.call_oi_change.toLocaleString()})
+                  </Text>
+                  <Text style={styles.zoneMeta}>
+                    PUT OI: {z.put_oi.toLocaleString()} (
+                    {z.put_oi_change >= 0 ? '+' : ''}
+                    {z.put_oi_change.toLocaleString()})
+                  </Text>
+                </View>
               ))
             ) : (
               <Text style={styles.muted}>No resistance zones available</Text>
@@ -338,8 +357,15 @@ const styles = StyleSheet.create({
   confidenceText: { color: '#64748B', fontWeight: '700' },
   section: { margin: 16 },
   sectionTitle: { fontSize: 18, fontWeight: '800' },
-  zoneHeader: { marginTop: 12, fontWeight: '800' },
-  zoneItem: { marginLeft: 8, marginTop: 4 },
+  zoneHeader: { marginTop: 16, fontWeight: '800' },
+  zoneRow: {
+    marginTop: 10,
+    padding: 12,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+  },
+  zoneStrike: { fontWeight: '900', marginBottom: 4 },
+  zoneMeta: { fontSize: 13, color: '#334155' },
   muted: { color: '#64748B', fontStyle: 'italic' },
   footer: { margin: 16 },
   timestamp: { textAlign: 'center', color: '#64748B' },
