@@ -1,5 +1,4 @@
 package com.fungen.app
-import com.fungen.app.BuildConfig
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule
@@ -16,7 +15,5 @@ class FeatureFlagPackage : ReactPackage {
 
     override fun createViewManagers(
         reactContext: ReactApplicationContext
-    ): List<ViewManager<*, *>> {
-        return emptyList()
-    }
+    ): List<ViewManager<*, *>> = emptyList()
 }
