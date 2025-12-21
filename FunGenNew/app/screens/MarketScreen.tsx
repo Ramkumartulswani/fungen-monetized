@@ -24,7 +24,7 @@ const MARKET_URLS: any = {
 export default function MarketScreen() {
   const navigation = useNavigation();
 
-  // ✅ ALL hooks must be INSIDE component
+  /* ---------------- STATE ---------------- */
   const [showProBanner, setShowProBanner] = useState(true);
 
   const [data, setData] = useState<any>(null);
@@ -36,16 +36,16 @@ export default function MarketScreen() {
     'NIFTY'
   );
 
-  const [viewMode, setViewMode] = useState<'overview' | 'detailed' | 'zones'>(
-    'overview'
-  );
+  const [viewMode, setViewMode] = useState<
+    'overview' | 'detailed' | 'zones'
+  >('overview');
 
-  /* ---------- FETCH DATA ---------- */
+  /* ---------------- FETCH DATA ---------------- */
   useEffect(() => {
     fetchMarketData();
   }, [selectedIndex]);
 
-  /* ---------- FEATURE FLAGS (SAFE) ---------- */
+  /* ---------------- FEATURE FLAGS ---------------- */
   useEffect(() => {
     let mounted = true;
 
@@ -87,7 +87,7 @@ export default function MarketScreen() {
       maximumFractionDigits: 2,
     }).format(price);
 
-  /* ---------- LOADING ---------- */
+  /* ---------------- LOADING ---------------- */
   if (loading) {
     return (
       <View style={styles.center}>
@@ -98,7 +98,7 @@ export default function MarketScreen() {
     );
   }
 
-  /* ---------- ERROR ---------- */
+  /* ---------------- ERROR ---------------- */
   if (error || !data) {
     return (
       <View style={styles.center}>
@@ -136,7 +136,7 @@ export default function MarketScreen() {
           <Text style={styles.headerSubtitle}>Live Options Analysis</Text>
         </View>
 
-        {/* MARKET PRO BANNER (REMOTE-CONTROLLED) */}
+        {/* MARKET PRO BANNER */}
         {showProBanner && (
           <TouchableOpacity
             style={styles.proBanner}
@@ -173,7 +173,7 @@ export default function MarketScreen() {
 
         {/* VIEW MODE */}
         <View style={styles.viewModeToggle}>
-          {['overview', 'detailed', 'zones'].map(mode => (
+          {['overview', 'zones'].map(mode => (
             <TouchableOpacity
               key={mode}
               style={[
@@ -221,6 +221,35 @@ export default function MarketScreen() {
           </View>
         )}
 
+        {/* ZONES */}
+        {viewMode === 'zones' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>📍 Option Zones</Text>
+
+            <Text style={styles.zoneHeader}>🟢 Support Zones</Text>
+            {data.zones?.support?.length > 0 ? (
+              data.zones.support.map((z: any, i: number) => (
+                <Text key={`sup-${i}`} style={styles.zoneItem}>
+                  {z.strike} • {z.strength}
+                </Text>
+              ))
+            ) : (
+              <Text style={styles.muted}>No support zones available</Text>
+            )}
+
+            <Text style={styles.zoneHeader}>🔴 Resistance Zones</Text>
+            {data.zones?.resistance?.length > 0 ? (
+              data.zones.resistance.map((z: any, i: number) => (
+                <Text key={`res-${i}`} style={styles.zoneItem}>
+                  {z.strike} • {z.strength}
+                </Text>
+              ))
+            ) : (
+              <Text style={styles.muted}>No resistance zones available</Text>
+            )}
+          </View>
+        )}
+
         {/* FOOTER */}
         <View style={styles.footer}>
           <Text style={styles.timestamp}>{data.timestamp}</Text>
@@ -235,7 +264,7 @@ export default function MarketScreen() {
   );
 }
 
-/* ---------- STYLES ---------- */
+/* ---------------- STYLES ---------------- */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -309,6 +338,9 @@ const styles = StyleSheet.create({
   confidenceText: { color: '#64748B', fontWeight: '700' },
   section: { margin: 16 },
   sectionTitle: { fontSize: 18, fontWeight: '800' },
+  zoneHeader: { marginTop: 12, fontWeight: '800' },
+  zoneItem: { marginLeft: 8, marginTop: 4 },
+  muted: { color: '#64748B', fontStyle: 'italic' },
   footer: { margin: 16 },
   timestamp: { textAlign: 'center', color: '#64748B' },
   disclaimer: {
