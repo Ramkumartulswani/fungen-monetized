@@ -1,5 +1,5 @@
 package com.fungen.app
-import com.google.firebase.FirebaseApp
+
 import com.fungen.app.BuildConfig
 
 import android.app.Application
@@ -13,6 +13,8 @@ import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.facebook.react.defaults.DefaultReactNativeHost
 import com.facebook.react.flipper.ReactNativeFlipper
 import com.facebook.soloader.SoLoader
+import com.google.firebase.FirebaseApp
+import com.google.android.gms.common.GoogleApiAvailability
 
 class MainApplication : Application(), ReactApplication {
 
@@ -39,7 +41,19 @@ class MainApplication : Application(), ReactApplication {
   override fun onCreate() {
     super.onCreate()
     // ✅ REQUIRED: Initialize Firebase BEFORE anything uses it
-    FirebaseApp.initializeApp(this)
+    val apiAvailability = GoogleApiAvailability.getInstance()
+    val result = apiAvailability.isGooglePlayServicesAvailable(this)
+
+    if (result == com.google.android.gms.common.ConnectionResult.SUCCESS) {
+        FirebaseApp.initializeApp(this)
+    } else {
+        // ❗ DO NOT CRASH
+        // Log only, app must continue
+        android.util.Log.w(
+            "Firebase",
+            "Google Play Services not available: $result"
+        )
+    }
     SoLoader.init(this, false)
     if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
       load()

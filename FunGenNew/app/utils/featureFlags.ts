@@ -5,7 +5,7 @@ type FeatureFlags = {
   premiumEnabled: boolean;
   maxFreeUses: number;
   showUpgradeBanner: boolean;
-  showMarketProBanner: boolean; // 👈 NEW
+  showMarketProBanner: boolean;
 };
 
 const defaultFlags: FeatureFlags = {
@@ -13,24 +13,32 @@ const defaultFlags: FeatureFlags = {
   premiumEnabled: true,
   maxFreeUses: 5,
   showUpgradeBanner: false,
-  showMarketProBanner: true, // 👈 DEFAULT = existing behaviour
+  showMarketProBanner: true, // ✅ default = existing behavior
 };
 
-
 export async function getFeatureFlags(): Promise<FeatureFlags> {
+  // iOS / Web / fallback
   if (Platform.OS !== 'android') {
     return defaultFlags;
   }
 
   try {
-    const nativeFlags = await NativeModules.FeatureFlags?.getFlags?.();
-    return {
-  ...defaultFlags,
-  ...nativeFlags,
-  showMarketProBanner:
-    nativeFlags?.showMarketProBanner ?? true,
-};
+    const nativeModule = NativeModules.FeatureFlags;
 
+    if (!nativeModule || typeof nativeModule.getFlags !== 'function') {
+      return defaultFlags;
+    }
+
+    const nativeFlags = await nativeModule.getFlags();
+
+    return {
+      ...defaultFlags,
+      ...nativeFlags,
+
+      // 👇 banner visibility derived safely
+      showMarketProBanner:
+        nativeFlags?.paywallEnabled ?? defaultFlags.showMarketProBanner,
+    };
   } catch (e) {
     return defaultFlags;
   }

@@ -11,12 +11,8 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
-
-// ✅ NEW (SAFE): Feature flags helper
-import { getFeatureFlags } from '../utils/featureFlags'; // adjust path if needed
-
-const [showProBanner, setShowProBanner] = useState(true);
-
+// ✅ Feature flags (safe wrapper)
+import { getFeatureFlags } from '../utils/featureFlags';
 
 const MARKET_URLS: any = {
   NIFTY:
@@ -28,34 +24,46 @@ const MARKET_URLS: any = {
 export default function MarketScreen() {
   const navigation = useNavigation();
 
+  // ✅ ALL hooks must be INSIDE component
+  const [showProBanner, setShowProBanner] = useState(true);
+
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
+
   const [selectedIndex, setSelectedIndex] = useState<'NIFTY' | 'BANKNIFTY'>(
     'NIFTY'
   );
+
   const [viewMode, setViewMode] = useState<'overview' | 'detailed' | 'zones'>(
     'overview'
   );
 
-  /* ---------- EXISTING EFFECT (UNCHANGED) ---------- */
+  /* ---------- FETCH DATA ---------- */
   useEffect(() => {
     fetchMarketData();
   }, [selectedIndex]);
 
-  /* ---------- NEW EFFECT (SAFE / OBSERVE ONLY) ---------- */
+  /* ---------- FEATURE FLAGS (SAFE) ---------- */
   useEffect(() => {
-  (async () => {
-    try {
-      const flags = await getFeatureFlags();
-      setShowProBanner(flags.showMarketProBanner);
-    } catch {
-      // ignore
-    }
-  })();
-}, []);
+    let mounted = true;
 
+    (async () => {
+      try {
+        const flags = await getFeatureFlags();
+        if (mounted) {
+          setShowProBanner(flags.showMarketProBanner);
+        }
+      } catch {
+        // fail silently
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const fetchMarketData = async () => {
     try {
@@ -72,9 +80,6 @@ export default function MarketScreen() {
       setRefreshing(false);
     }
   };
-
-  const formatNumber = (num: number) =>
-    new Intl.NumberFormat('en-IN', { notation: 'compact' }).format(num);
 
   const formatPrice = (price: number) =>
     new Intl.NumberFormat('en-IN', {
@@ -131,7 +136,7 @@ export default function MarketScreen() {
           <Text style={styles.headerSubtitle}>Live Options Analysis</Text>
         </View>
 
-        {/* MARKET PRO CTA (UNCHANGED) */}
+        {/* MARKET PRO BANNER (REMOTE-CONTROLLED) */}
         {showProBanner && (
           <TouchableOpacity
             style={styles.proBanner}
@@ -142,7 +147,6 @@ export default function MarketScreen() {
             </Text>
           </TouchableOpacity>
         )}
-
 
         {/* INDEX SELECTOR */}
         <View style={styles.selectorContainer}>
