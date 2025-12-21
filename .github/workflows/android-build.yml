@@ -63,6 +63,13 @@ jobs:
         run: |
           echo "${{ secrets.FUNGEN_KEYSTORE_BASE64 }}" | base64 --decode > FunGenNew/android/app/fungen-release.keystore
 
+      - name: Print SHA-1 of release keystore
+        run: |
+            keytool -list -v \
+              -keystore FunGenNew/android/app/fungen-release.keystore \
+              -storepass "${{ secrets.FUNGEN_STORE_PASSWORD }}" \
+              -alias "${{ secrets.FUNGEN_KEY_ALIAS }}"
+
 
       - name: Prepare Gradle signing config
         run: |
