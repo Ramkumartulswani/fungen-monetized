@@ -1,11 +1,6 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
-
 apply plugin: "com.google.gms.google-services"
-
-// ❌ NO react {} block here
-
-def jscFlavor = 'org.webkit:android-jsc:+'
 
 android {
     namespace "com.fungen.app"
@@ -13,41 +8,41 @@ android {
 
     defaultConfig {
         applicationId "com.fungen.app"
-        minSdkVersion 23
-        targetSdkVersion 34
+        minSdk 23
+        targetSdk 34
         versionCode 7
         versionName "1.0.8"
     }
 
-    buildFeatures {
-        buildConfig true
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
     }
 
     buildTypes {
         debug {}
         release {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile(
-                "proguard-android.txt"
-            ), "proguard-rules.pro"
         }
     }
 }
-
 
 dependencies {
     implementation platform("com.google.firebase:firebase-bom:32.7.0")
     implementation "com.google.firebase:firebase-config"
 
+    // ✅ React Native core (THIS FIXES ALL unresolved facebook imports)
     implementation("com.facebook.react:react-android")
 
-    def isHermesEnabled = project.findProperty("hermesEnabled")?.toBoolean() ?: false
-    if (isHermesEnabled) {
-        implementation("com.facebook.react:hermes-android")
-    } else {
-        implementation jscFlavor
-    }
+    // Hermes
+    implementation("com.facebook.react:hermes-android")
 }
 
 apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle")
 applyNativeModulesAppBuildGradle(project)
+
+
