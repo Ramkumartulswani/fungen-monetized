@@ -1,57 +1,31 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
-apply plugin: "com.facebook.react"
+
 apply plugin: "com.google.gms.google-services"
 
-react {}
+// ❌ NO react {} block here
 
 def jscFlavor = 'org.webkit:android-jsc:+'
 
 android {
-    ndkVersion rootProject.ext.ndkVersion
-    buildToolsVersion rootProject.ext.buildToolsVersion
-    compileSdk rootProject.ext.compileSdkVersion
-
-    // ✅ MUST MATCH applicationId + Firebase + Kotlin packages
     namespace "com.fungen.app"
-
-    // ✅ REQUIRED FOR BuildConfig (AGP 8+)
-    buildFeatures {
-        buildConfig true
-    }
+    compileSdk 34
 
     defaultConfig {
         applicationId "com.fungen.app"
-        minSdkVersion rootProject.ext.minSdkVersion
-        targetSdkVersion rootProject.ext.targetSdkVersion
+        minSdkVersion 23
+        targetSdkVersion 34
         versionCode 7
         versionName "1.0.8"
     }
 
-    // ✅ SAFE SIGNING CONFIG (UNCHANGED LOGIC)
-    signingConfigs {
-        release {
-            def storeFilePath = project.findProperty("FUNGEN_UPLOAD_STORE_FILE")
-            if (storeFilePath != null) {
-                storeFile file(storeFilePath)
-                storePassword project.findProperty("FUNGEN_UPLOAD_STORE_PASSWORD")
-                keyAlias project.findProperty("FUNGEN_UPLOAD_KEY_ALIAS")
-                keyPassword project.findProperty("FUNGEN_UPLOAD_KEY_PASSWORD")
-            }
-        }
+    buildFeatures {
+        buildConfig true
     }
 
     buildTypes {
-        debug {
-            // ❌ NO signingConfig here
-        }
-
+        debug {}
         release {
-            // ✅ Only apply signing if keystore is present
-            if (signingConfigs.release.storeFile != null) {
-                signingConfig signingConfigs.release
-            }
-
             minifyEnabled false
             proguardFiles getDefaultProguardFile(
                 "proguard-android.txt"
@@ -60,20 +34,14 @@ android {
     }
 }
 
-dependencies {
-    // 🔹 Firebase BOM
-    implementation platform("com.google.firebase:firebase-bom:32.7.0")
 
-    // 🔹 Firebase Remote Config
+dependencies {
+    implementation platform("com.google.firebase:firebase-bom:32.7.0")
     implementation "com.google.firebase:firebase-config"
 
-    // 🔹 React Native core
     implementation("com.facebook.react:react-android")
-    implementation("com.facebook.react:flipper-integration")
 
-    // ✅ SAFE Hermes flag resolution (AGP 8 compatible)
     def isHermesEnabled = project.findProperty("hermesEnabled")?.toBoolean() ?: false
-
     if (isHermesEnabled) {
         implementation("com.facebook.react:hermes-android")
     } else {
