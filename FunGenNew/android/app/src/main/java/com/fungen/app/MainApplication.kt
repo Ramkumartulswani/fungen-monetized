@@ -1,5 +1,6 @@
 package com.fungen.app
 import com.google.firebase.FirebaseApp
+import com.fungen.app.BuildConfig
 
 import android.app.Application
 import com.facebook.react.PackageList

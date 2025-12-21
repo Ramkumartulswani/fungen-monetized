@@ -1,4 +1,5 @@
 package com.fungen.app
+import com.fungen.app.BuildConfig
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule

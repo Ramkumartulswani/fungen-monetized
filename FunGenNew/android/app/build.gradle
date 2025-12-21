@@ -12,7 +12,13 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.fungen"
+    // ✅ MUST MATCH applicationId + Firebase + Kotlin packages
+    namespace "com.fungen.app"
+
+    // ✅ REQUIRED FOR BuildConfig (AGP 8+)
+    buildFeatures {
+        buildConfig true
+    }
 
     defaultConfig {
         applicationId "com.fungen.app"
@@ -22,7 +28,7 @@ android {
         versionName "1.0.8"
     }
 
-    // ✅ SAFE SIGNING CONFIG
+    // ✅ SAFE SIGNING CONFIG (UNCHANGED LOGIC)
     signingConfigs {
         release {
             def storeFilePath = project.findProperty("FUNGEN_UPLOAD_STORE_FILE")
@@ -41,6 +47,7 @@ android {
         }
 
         release {
+            // ✅ Only apply signing if keystore is present
             if (signingConfigs.release.storeFile != null) {
                 signingConfig signingConfigs.release
             }
@@ -50,27 +57,29 @@ android {
                 "proguard-android.txt"
             ), "proguard-rules.pro"
         }
-
     }
 }
 
 dependencies {
-    // 🔹 Firebase BOM (you can keep this version or update later)
+    // 🔹 Firebase BOM
     implementation platform("com.google.firebase:firebase-bom:32.7.0")
 
-    // ✅ ADD THIS LINE (REQUIRED)
+    // 🔹 Firebase Remote Config
     implementation "com.google.firebase:firebase-config"
 
+    // 🔹 React Native core
     implementation("com.facebook.react:react-android")
     implementation("com.facebook.react:flipper-integration")
 
-    if (hermesEnabled.toBoolean()) {
+    // ✅ SAFE Hermes flag resolution (AGP 8 compatible)
+    def isHermesEnabled = project.findProperty("hermesEnabled")?.toBoolean() ?: false
+
+    if (isHermesEnabled) {
         implementation("com.facebook.react:hermes-android")
     } else {
         implementation jscFlavor
     }
 }
-
 
 apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle")
 applyNativeModulesAppBuildGradle(project)

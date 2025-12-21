@@ -1,4 +1,5 @@
 package com.fungen.app
+import com.fungen.app.BuildConfig
 
 object FeatureFlags {
     var PAYWALL_ENABLED = false

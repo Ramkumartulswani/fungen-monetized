@@ -1,5 +1,7 @@
 package com.fungen.app
 
+import com.fungen.app.BuildConfig
+
 import android.os.Bundle
 import android.util.Log
 import com.facebook.react.ReactActivity
