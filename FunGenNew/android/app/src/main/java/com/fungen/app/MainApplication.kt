@@ -9,7 +9,7 @@ import com.facebook.react.ReactPackage
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.load
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.facebook.react.defaults.DefaultReactNativeHost
-import com.facebook.react.flipper.ReactNativeFlipper
+
 import com.facebook.soloader.SoLoader
 import com.google.firebase.FirebaseApp
 
@@ -54,10 +54,6 @@ class MainApplication : Application(), ReactApplication {
     if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
       load()
     }
-
-    ReactNativeFlipper.initializeFlipper(
-      this,
-      reactNativeHost.reactInstanceManager
-    )
+    
   }
 }
