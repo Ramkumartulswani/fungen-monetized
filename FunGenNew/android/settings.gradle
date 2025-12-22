@@ -1,4 +1,25 @@
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
 rootProject.name = "FunGenNew"
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        google()
+        mavenCentral()
+
+        // ✅ REQUIRED for React Native core artifacts
+        maven {
+            url("$rootDir/../node_modules/react-native/android")
+        }
+    }
+}
 
 include(":app")
 
