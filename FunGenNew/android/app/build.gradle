@@ -2,6 +2,7 @@ plugins {
     id "com.android.application"
     id "org.jetbrains.kotlin.android"
     id "com.facebook.react"
+    
 }
 
 android {
@@ -40,12 +41,17 @@ android {
 
 dependencies {
     // Firebase disabled for now
-    // implementation platform("com.google.firebase:firebase-bom:32.7.0")
-    // implementation "com.google.firebase:firebase-config"
+     implementation platform("com.google.firebase:firebase-bom:32.7.0")
+     implementation "com.google.firebase:firebase-config"
 
     implementation("com.facebook.react:react-android")
     implementation("com.facebook.react:hermes-android")
+    debugImplementation("com.facebook.flipper:flipper:0.211.0")
+    debugImplementation("com.facebook.flipper:flipper-network-plugin:0.211.0")
+    debugImplementation("com.facebook.flipper:flipper-fresco-plugin:0.211.0")
 }
 
 apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle")
 applyNativeModulesAppBuildGradle(project)
+apply plugin: "com.google.gms.google-services"
+
