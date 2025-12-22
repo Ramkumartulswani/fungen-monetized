@@ -10,7 +10,13 @@ import {
   UIManager,
   RefreshControl,
 } from 'react-native';
-import PushNotification from 'react-native-push-notification';
+
+let PushNotification: any = null;
+try {
+  PushNotification = require('react-native-push-notification');
+} catch {
+  // Safe for release if lib is missing
+}
 
 if (Platform.OS === 'android') {
   UIManager.setLayoutAnimationEnabledExperimental?.(true);
@@ -32,55 +38,48 @@ type Zone = {
 
 type MarketData = {
   spot_price: number;
-  key_indicators: {
-    pcr_oi: number;
-    pcr_interpretation: string;
-    net_oi_change: number;
-    net_oi_interpretation: string;
-  };
   market_outlook: {
-    direction_symbol: string;
-    confidence: string;
-    signals: string[];
+    direction?: string;
+    direction_symbol?: string;
+    confidence?: string;
+    signals?: string[];
   };
   zones: {
     support: Zone[];
     resistance: Zone[];
   };
-  parallel_oi_analysis: {
-    support_zone: { summary: string };
-    resistance_zone: { summary: string };
-    cross_strike_analysis: { bias_interpretation: string };
+  parallel_oi_analysis?: {
+    support_zone?: { summary?: string };
+    resistance_zone?: { summary?: string };
   };
 };
 
+/* ===================== CONFIG ===================== */
+
+const API_URL = 'https://your-api-url/nifty_market.json';
+const REFRESH_INTERVAL = 60_000;
+
 /* ===================== HELPERS ===================== */
 
-const API_URL = 'https://your-api-url/NIFTY.json';
-const REFRESH_INTERVAL_MS = 60000;
+const formatNumber = (n = 0) => {
+  if (Math.abs(n) >= 100000) return (n / 100000).toFixed(2) + 'L';
+  if (Math.abs(n) >= 1000) return (n / 1000).toFixed(1) + 'K';
+  return n.toFixed(0);
+};
 
-const getStorageLabel = (zone: Zone, isSupport: boolean) => {
-  const code = zone.interpretation_code;
-
+const getStorageLabel = (z: Zone, isSupport: boolean) => {
+  const c = z.interpretation_code;
   if (isSupport) {
-    if (code === 'STRONG_BUY') return '🟢🟢 STRONG BULLISH STORAGE';
-    if (code === 'HEAVY_SUPPORT') return '🟢 STORING BULLISH';
-    if (code === 'LONG_UNWINDING') return '🔴 STORING BEARISH';
+    if (c === 'STRONG_BUY') return '🟢🟢 STRONG SUPPORT';
+    if (c === 'HEAVY_SUPPORT') return '🟢 SUPPORT';
   } else {
-    if (code === 'STRONG_SELL') return '🔴🔴 STRONG BEARISH STORAGE';
-    if (code === 'HEAVY_RESISTANCE') return '🔴 STORING BEARISH';
-    if (code === 'SHORT_COVERING') return '🟢 STORING BULLISH';
+    if (c === 'STRONG_SELL') return '🔴🔴 STRONG RESISTANCE';
+    if (c === 'HEAVY_RESISTANCE') return '🔴 RESISTANCE';
   }
-  return '🟡 STORING RANGE';
+  return '🟡 RANGE';
 };
 
-const formatNumber = (num: number) => {
-  if (Math.abs(num) >= 100000) return (num / 100000).toFixed(2) + 'L';
-  if (Math.abs(num) >= 1000) return (num / 1000).toFixed(1) + 'K';
-  return num.toFixed(0);
-};
-
-/* ===================== MAIN SCREEN ===================== */
+/* ===================== SCREEN ===================== */
 
 export default function MarketScreen() {
   const [data, setData] = useState<MarketData | null>(null);
@@ -88,111 +87,60 @@ export default function MarketScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState('');
 
-  // Prevent overlapping fetches
-  const isFetchingRef = useRef(false);
+  const fetching = useRef(false);
 
-  // Track previous intensity for alert comparison
-  const prevIntensityRef = useRef<Record<number, number>>({});
-
-  /* ---------- Notifications ---------- */
-
+  /* ---------- Notifications (SAFE) ---------- */
   useEffect(() => {
+    if (!PushNotification) return;
     PushNotification.createChannel({
       channelId: 'market-alerts',
       channelName: 'Market Alerts',
-      channelDescription: 'Strike storage intensity alerts',
       importance: 4,
     });
   }, []);
 
-  /* ---------- Alert Logic ---------- */
-
-  const checkAndNotify = (zone: Zone, isSupport: boolean) => {
-    const intensity = isSupport
-      ? zone.put_oi_change_pct
-      : zone.call_oi_change_pct;
-
-    const prev = prevIntensityRef.current[zone.strike] ?? 0;
-    const label = getStorageLabel(zone, isSupport);
-
-    if (
-      intensity > 70 &&
-      intensity > prev &&
-      label.includes('STRONG')
-    ) {
-      PushNotification.localNotification({
-        channelId: 'market-alerts',
-        title: 'Storage Intensifying',
-        message: `${zone.strike} → ${label} (${intensity.toFixed(1)}%)`,
-        importance: 'high',
-      });
-    }
-
-    prevIntensityRef.current[zone.strike] = intensity;
-  };
-
-  /* ---------- Fetch Data (SAFE) ---------- */
-
-  const fetchData = async (source: 'auto' | 'manual' = 'auto') => {
-    if (isFetchingRef.current) return;
-
-    isFetchingRef.current = true;
+  /* ---------- Fetch ---------- */
+  const fetchData = async () => {
+    if (fetching.current) return;
+    fetching.current = true;
 
     try {
       const res = await fetch(API_URL, { cache: 'no-store' });
-      const json: MarketData = await res.json();
+      const json = await res.json();
 
-      if (!json?.zones) return;
-
-      setData({ ...json }); // force re-render
-      setLastUpdate(new Date().toLocaleTimeString());
-
-      json.zones.support.forEach(z => checkAndNotify(z, true));
-      json.zones.resistance.forEach(z => checkAndNotify(z, false));
-
-      if (source === 'manual') {
-        console.log('🔄 Manual refresh done');
+      if (!json?.zones?.support || !json?.zones?.resistance) {
+        console.warn('Invalid market JSON');
+        return;
       }
+
+      setData(json);
+      setLastUpdate(new Date().toLocaleTimeString());
     } catch (e) {
-      console.error('Market fetch failed:', e);
+      console.error('Market fetch failed', e);
     } finally {
-      isFetchingRef.current = false;
+      fetching.current = false;
     }
   };
 
-  /* ---------- Auto Refresh Loop ---------- */
-
+  /* ---------- Auto Refresh ---------- */
   useEffect(() => {
-    let active = true;
-
-    const loop = async () => {
-      while (active) {
-        await fetchData('auto');
-        await new Promise(r => setTimeout(r, REFRESH_INTERVAL_MS));
-      }
-    };
-
-    loop();
-    return () => {
-      active = false;
-    };
+    fetchData();
+    const id = setInterval(fetchData, REFRESH_INTERVAL);
+    return () => clearInterval(id);
   }, []);
-
-  /* ---------- Manual Refresh ---------- */
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchData('manual');
+    await fetchData();
     setRefreshing(false);
   };
-
-  /* ---------- UI ---------- */
 
   const toggle = (strike: number) => {
     LayoutAnimation.easeInEaseOut();
     setExpanded(p => ({ ...p, [strike]: !p[strike] }));
   };
 
+  /* ---------- Loading ---------- */
   if (!data) {
     return (
       <View style={styles.container}>
@@ -200,6 +148,8 @@ export default function MarketScreen() {
       </View>
     );
   }
+
+  const outlook = data.market_outlook || {};
 
   return (
     <ScrollView
@@ -213,15 +163,16 @@ export default function MarketScreen() {
         <Text style={styles.symbol}>NIFTY</Text>
         <Text style={styles.price}>₹{data.spot_price.toFixed(2)}</Text>
         <Text style={styles.outlook}>
-          {data.market_outlook.direction_symbol} · Storage View · {data.market_outlook.confidence}
+          {outlook.direction_symbol ?? outlook.direction ?? '—'} ·{' '}
+          {outlook.confidence ?? '—'}
         </Text>
         <Text style={styles.timestamp}>Updated: {lastUpdate}</Text>
       </View>
 
       {/* SUPPORT */}
-      <Text style={styles.sectionTitle}>🟢 Support Storage</Text>
+      <Text style={styles.sectionTitle}>🟢 Support Zones</Text>
       <Text style={styles.zoneSummary}>
-        {data.parallel_oi_analysis.support_zone.summary}
+        {data.parallel_oi_analysis?.support_zone?.summary ?? ''}
       </Text>
 
       {data.zones.support.map(z => (
@@ -235,8 +186,8 @@ export default function MarketScreen() {
 
           {expanded[z.strike] && (
             <View style={styles.details}>
-              <Text>Put OI: {formatNumber(z.put_oi)} ({z.put_oi_change_pct.toFixed(1)}%)</Text>
-              <Text>Call OI: {formatNumber(z.call_oi)} ({z.call_oi_change_pct.toFixed(1)}%)</Text>
+              <Text>Put OI: {formatNumber(z.put_oi)} ({z.put_oi_change_pct}%)</Text>
+              <Text>Call OI: {formatNumber(z.call_oi)} ({z.call_oi_change_pct}%)</Text>
               <Text style={styles.note}>{z.interpretation}</Text>
             </View>
           )}
@@ -244,9 +195,9 @@ export default function MarketScreen() {
       ))}
 
       {/* RESISTANCE */}
-      <Text style={styles.sectionTitle}>🔴 Resistance Storage</Text>
+      <Text style={styles.sectionTitle}>🔴 Resistance Zones</Text>
       <Text style={styles.zoneSummary}>
-        {data.parallel_oi_analysis.resistance_zone.summary}
+        {data.parallel_oi_analysis?.resistance_zone?.summary ?? ''}
       </Text>
 
       {data.zones.resistance.map(z => (
@@ -260,8 +211,8 @@ export default function MarketScreen() {
 
           {expanded[z.strike] && (
             <View style={styles.details}>
-              <Text>Call OI: {formatNumber(z.call_oi)} ({z.call_oi_change_pct.toFixed(1)}%)</Text>
-              <Text>Put OI: {formatNumber(z.put_oi)} ({z.put_oi_change_pct.toFixed(1)}%)</Text>
+              <Text>Call OI: {formatNumber(z.call_oi)} ({z.call_oi_change_pct}%)</Text>
+              <Text>Put OI: {formatNumber(z.put_oi)} ({z.put_oi_change_pct}%)</Text>
               <Text style={styles.note}>{z.interpretation}</Text>
             </View>
           )}
@@ -269,7 +220,7 @@ export default function MarketScreen() {
       ))}
 
       <Text style={styles.footer}>
-        ℹ️ Strike-wise storage information only. No trading advice.
+        ℹ️ Informational view only. Not trading advice.
       </Text>
     </ScrollView>
   );
