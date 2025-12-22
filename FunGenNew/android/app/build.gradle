@@ -30,10 +30,22 @@ android {
     ]
     }
 
+    signingConfigs {
+        release {
+            if (project.hasProperty('FUNGEN_UPLOAD_STORE_FILE')) {
+                storeFile file(FUNGEN_UPLOAD_STORE_FILE)
+                storePassword FUNGEN_UPLOAD_STORE_PASSWORD
+                keyAlias FUNGEN_UPLOAD_KEY_ALIAS
+                keyPassword FUNGEN_UPLOAD_KEY_PASSWORD
+            }
+        }
+    }
+
 
     buildTypes {
         debug {}
         release {
+            signingConfig signingConfigs.release   // ✅ THIS LINE IS CRITICAL
             minifyEnabled false
         }
     }
