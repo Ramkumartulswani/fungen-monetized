@@ -1,379 +1,303 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ActivityIndicator,
-  RefreshControl,
   ScrollView,
   TouchableOpacity,
+  LayoutAnimation,
   Platform,
+  UIManager,
+  RefreshControl,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import PushNotification from 'react-native-push-notification';
 
-// Feature flags
-import { getFeatureFlags } from '../utils/featureFlags';
+if (Platform.OS === 'android') {
+  UIManager.setLayoutAnimationEnabledExperimental?.(true);
+}
 
-const MARKET_URLS: any = {
-  NIFTY:
-    'https://drive.google.com/uc?export=download&id=1t9fYO6ry9igdt3DZqlBqakMArBA4CdUK',
-  BANKNIFTY:
-    'https://drive.google.com/uc?export=download&id=1Yj0AtywQaR-RW0ofrOpw7p8Yi1S66WVa',
+/* ===================== TYPES ===================== */
+
+type Zone = {
+  strike: number;
+  call_oi: number;
+  call_oi_change: number;
+  call_oi_change_pct: number;
+  put_oi: number;
+  put_oi_change: number;
+  put_oi_change_pct: number;
+  interpretation: string;
+  interpretation_code: string;
 };
 
+type MarketData = {
+  spot_price: number;
+  key_indicators: {
+    pcr_oi: number;
+    pcr_interpretation: string;
+    net_oi_change: number;
+    net_oi_interpretation: string;
+  };
+  market_outlook: {
+    direction_symbol: string;
+    confidence: string;
+    signals: string[];
+  };
+  zones: {
+    support: Zone[];
+    resistance: Zone[];
+  };
+  parallel_oi_analysis: {
+    support_zone: { summary: string };
+    resistance_zone: { summary: string };
+    cross_strike_analysis: { bias_interpretation: string };
+  };
+};
+
+/* ===================== HELPERS ===================== */
+
+const API_URL = 'https://your-api-url/NIFTY.json';
+const REFRESH_INTERVAL_MS = 60000;
+
+const getStorageLabel = (zone: Zone, isSupport: boolean) => {
+  const code = zone.interpretation_code;
+
+  if (isSupport) {
+    if (code === 'STRONG_BUY') return '🟢🟢 STRONG BULLISH STORAGE';
+    if (code === 'HEAVY_SUPPORT') return '🟢 STORING BULLISH';
+    if (code === 'LONG_UNWINDING') return '🔴 STORING BEARISH';
+  } else {
+    if (code === 'STRONG_SELL') return '🔴🔴 STRONG BEARISH STORAGE';
+    if (code === 'HEAVY_RESISTANCE') return '🔴 STORING BEARISH';
+    if (code === 'SHORT_COVERING') return '🟢 STORING BULLISH';
+  }
+  return '🟡 STORING RANGE';
+};
+
+const formatNumber = (num: number) => {
+  if (Math.abs(num) >= 100000) return (num / 100000).toFixed(2) + 'L';
+  if (Math.abs(num) >= 1000) return (num / 1000).toFixed(1) + 'K';
+  return num.toFixed(0);
+};
+
+/* ===================== MAIN SCREEN ===================== */
+
 export default function MarketScreen() {
-  const navigation = useNavigation();
-
-  /* ---------------- STATE ---------------- */
-  const [showProBanner, setShowProBanner] = useState(true);
-
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<MarketData | null>(null);
+  const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState('');
 
-  const [selectedIndex, setSelectedIndex] =
-    useState<'NIFTY' | 'BANKNIFTY'>('NIFTY');
+  // Prevent overlapping fetches
+  const isFetchingRef = useRef(false);
 
-  const [viewMode, setViewMode] =
-    useState<'overview' | 'zones'>('overview');
+  // Track previous intensity for alert comparison
+  const prevIntensityRef = useRef<Record<number, number>>({});
 
-  /* ---------------- FETCH DATA ---------------- */
+  /* ---------- Notifications ---------- */
+
   useEffect(() => {
-    fetchMarketData();
-  }, [selectedIndex]);
-
-  /* ---------------- FEATURE FLAGS ---------------- */
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const flags = await getFeatureFlags();
-        if (mounted) {
-          setShowProBanner(flags.showMarketProBanner);
-        }
-      } catch {}
-    })();
-    return () => {
-      mounted = false;
-    };
+    PushNotification.createChannel({
+      channelId: 'market-alerts',
+      channelName: 'Market Alerts',
+      channelDescription: 'Strike storage intensity alerts',
+      importance: 4,
+    });
   }, []);
 
-  const fetchMarketData = async () => {
+  /* ---------- Alert Logic ---------- */
+
+  const checkAndNotify = (zone: Zone, isSupport: boolean) => {
+    const intensity = isSupport
+      ? zone.put_oi_change_pct
+      : zone.call_oi_change_pct;
+
+    const prev = prevIntensityRef.current[zone.strike] ?? 0;
+    const label = getStorageLabel(zone, isSupport);
+
+    if (
+      intensity > 70 &&
+      intensity > prev &&
+      label.includes('STRONG')
+    ) {
+      PushNotification.localNotification({
+        channelId: 'market-alerts',
+        title: 'Storage Intensifying',
+        message: `${zone.strike} → ${label} (${intensity.toFixed(1)}%)`,
+        importance: 'high',
+      });
+    }
+
+    prevIntensityRef.current[zone.strike] = intensity;
+  };
+
+  /* ---------- Fetch Data (SAFE) ---------- */
+
+  const fetchData = async (source: 'auto' | 'manual' = 'auto') => {
+    if (isFetchingRef.current) return;
+
+    isFetchingRef.current = true;
+
     try {
-      setError(false);
-      const url = MARKET_URLS[selectedIndex] + '&t=' + Date.now();
-      const res = await fetch(url);
-      const json = await res.json();
-      setData(json);
+      const res = await fetch(API_URL, { cache: 'no-store' });
+      const json: MarketData = await res.json();
+
+      if (!json?.zones) return;
+
+      setData({ ...json }); // force re-render
+      setLastUpdate(new Date().toLocaleTimeString());
+
+      json.zones.support.forEach(z => checkAndNotify(z, true));
+      json.zones.resistance.forEach(z => checkAndNotify(z, false));
+
+      if (source === 'manual') {
+        console.log('🔄 Manual refresh done');
+      }
     } catch (e) {
-      console.error(e);
-      setError(true);
+      console.error('Market fetch failed:', e);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      isFetchingRef.current = false;
     }
   };
 
-  const formatPrice = (price: number) =>
-    new Intl.NumberFormat('en-IN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(price);
+  /* ---------- Auto Refresh Loop ---------- */
 
-  /* ---------------- LOADING ---------------- */
-  if (loading) {
+  useEffect(() => {
+    let active = true;
+
+    const loop = async () => {
+      while (active) {
+        await fetchData('auto');
+        await new Promise(r => setTimeout(r, REFRESH_INTERVAL_MS));
+      }
+    };
+
+    loop();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  /* ---------- Manual Refresh ---------- */
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchData('manual');
+    setRefreshing(false);
+  };
+
+  /* ---------- UI ---------- */
+
+  const toggle = (strike: number) => {
+    LayoutAnimation.easeInEaseOut();
+    setExpanded(p => ({ ...p, [strike]: !p[strike] }));
+  };
+
+  if (!data) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.loadingEmoji}>📊</Text>
-        <ActivityIndicator size="large" color="#6366F1" />
-        <Text style={styles.loadingText}>Loading market data…</Text>
+      <View style={styles.container}>
+        <Text style={styles.loading}>Loading market data…</Text>
       </View>
     );
   }
-
-  /* ---------------- ERROR ---------------- */
-  if (error || !data) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.errorEmoji}>📉</Text>
-        <Text style={styles.errorText}>Connection Lost</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={fetchMarketData}>
-          <Text style={styles.retryButtonText}>🔄 Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  const bias = data.final_decision.bias;
-  const biasColor =
-    bias === 'BULLISH' ? '#10B981' :
-    bias === 'BEARISH' ? '#EF4444' : '#6B7280';
-  const biasEmoji =
-    bias === 'BULLISH' ? '🐂' :
-    bias === 'BEARISH' ? '🐻' : '⚖️';
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              fetchMarketData();
-            }}
-            tintColor="#6366F1"
-          />
-        }
-      >
-        {/* HEADER */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>📊 Market Pulse</Text>
-          <Text style={styles.headerSubtitle}>Live Options Analysis</Text>
-        </View>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
+      {/* HEADER */}
+      <View style={styles.header}>
+        <Text style={styles.symbol}>NIFTY</Text>
+        <Text style={styles.price}>₹{data.spot_price.toFixed(2)}</Text>
+        <Text style={styles.outlook}>
+          {data.market_outlook.direction_symbol} · Storage View · {data.market_outlook.confidence}
+        </Text>
+        <Text style={styles.timestamp}>Updated: {lastUpdate}</Text>
+      </View>
 
-        {/* PRO BANNER */}
-        {showProBanner && (
-          <TouchableOpacity
-            style={styles.proBanner}
-            onPress={() => navigation.navigate('MarketPaywall' as never)}
-          >
-            <Text style={styles.proText}>
-              ⭐ Unlock Market Pro – ₹49 / month
-            </Text>
-          </TouchableOpacity>
-        )}
+      {/* SUPPORT */}
+      <Text style={styles.sectionTitle}>🟢 Support Storage</Text>
+      <Text style={styles.zoneSummary}>
+        {data.parallel_oi_analysis.support_zone.summary}
+      </Text>
 
-        {/* INDEX SELECTOR */}
-        <View style={styles.selectorContainer}>
-          {['NIFTY', 'BANKNIFTY'].map(idx => (
-            <TouchableOpacity
-              key={idx}
-              style={[
-                styles.selectorButton,
-                selectedIndex === idx && styles.selectorActive,
-              ]}
-              onPress={() => setSelectedIndex(idx as any)}
-            >
-              <Text
-                style={[
-                  styles.selectorText,
-                  selectedIndex === idx && styles.selectorTextActive,
-                ]}
-              >
-                {idx}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+      {data.zones.support.map(z => (
+        <TouchableOpacity
+          key={z.strike}
+          style={styles.card}
+          onPress={() => toggle(z.strike)}
+        >
+          <Text style={styles.strike}>{z.strike}</Text>
+          <Text style={styles.label}>{getStorageLabel(z, true)}</Text>
 
-        {/* VIEW MODE */}
-        <View style={styles.viewModeToggle}>
-          {['overview', 'zones'].map(mode => (
-            <TouchableOpacity
-              key={mode}
-              style={[
-                styles.viewModeButton,
-                viewMode === mode && styles.viewModeActive,
-              ]}
-              onPress={() => setViewMode(mode as any)}
-            >
-              <Text
-                style={[
-                  styles.viewModeText,
-                  viewMode === mode && styles.viewModeTextActive,
-                ]}
-              >
-                {mode.toUpperCase()}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+          {expanded[z.strike] && (
+            <View style={styles.details}>
+              <Text>Put OI: {formatNumber(z.put_oi)} ({z.put_oi_change_pct.toFixed(1)}%)</Text>
+              <Text>Call OI: {formatNumber(z.call_oi)} ({z.call_oi_change_pct.toFixed(1)}%)</Text>
+              <Text style={styles.note}>{z.interpretation}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      ))}
 
-        {/* PRICE CARD */}
-        <View style={styles.card}>
-          <Text style={styles.indexLabel}>{data.index}</Text>
-          <Text style={styles.spotPrice}>
-            ₹{formatPrice(data.spot_price)}
-          </Text>
-          <Text style={styles.liveText}>LIVE</Text>
-        </View>
+      {/* RESISTANCE */}
+      <Text style={styles.sectionTitle}>🔴 Resistance Storage</Text>
+      <Text style={styles.zoneSummary}>
+        {data.parallel_oi_analysis.resistance_zone.summary}
+      </Text>
 
-        {/* BIAS */}
-        <View style={[styles.biasCard, { borderColor: biasColor }]}>
-          <Text style={styles.biasEmoji}>{biasEmoji}</Text>
-          <Text style={[styles.biasTitle, { color: biasColor }]}>
-            {bias}
-          </Text>
-          <Text style={styles.confidenceText}>
-            {data.final_decision.confidence} CONFIDENCE
-          </Text>
-        </View>
+      {data.zones.resistance.map(z => (
+        <TouchableOpacity
+          key={z.strike}
+          style={styles.card}
+          onPress={() => toggle(z.strike)}
+        >
+          <Text style={styles.strike}>{z.strike}</Text>
+          <Text style={styles.label}>{getStorageLabel(z, false)}</Text>
 
-        {/* OVERVIEW */}
-        {viewMode === 'overview' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>📊 Key Indicators</Text>
-            <Text>PCR: {data.key_indicators.pcr_oi.toFixed(2)}</Text>
-            <Text>ATM PCR: {data.key_indicators.atm_pcr.toFixed(2)}</Text>
-          </View>
-        )}
+          {expanded[z.strike] && (
+            <View style={styles.details}>
+              <Text>Call OI: {formatNumber(z.call_oi)} ({z.call_oi_change_pct.toFixed(1)}%)</Text>
+              <Text>Put OI: {formatNumber(z.put_oi)} ({z.put_oi_change_pct.toFixed(1)}%)</Text>
+              <Text style={styles.note}>{z.interpretation}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      ))}
 
-        {/* ZONES */}
-        {viewMode === 'zones' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>📍 Option Zones</Text>
-
-            <Text style={styles.zoneHeader}>🟢 Support Zones</Text>
-            {data.zones?.support?.length ? (
-              data.zones.support.map((z: any, i: number) => (
-                <View key={`sup-${i}`} style={styles.zoneRow}>
-                  <Text style={styles.zoneStrike}>Strike {z.strike}</Text>
-                  <Text style={styles.zoneMeta}>
-                    PUT OI: {z.put_oi.toLocaleString()} (
-                    {z.put_oi_change >= 0 ? '+' : ''}
-                    {z.put_oi_change.toLocaleString()})
-                  </Text>
-                  <Text style={styles.zoneMeta}>
-                    CALL OI: {z.call_oi.toLocaleString()} (
-                    {z.call_oi_change >= 0 ? '+' : ''}
-                    {z.call_oi_change.toLocaleString()})
-                  </Text>
-                </View>
-              ))
-            ) : (
-              <Text style={styles.muted}>No support zones available</Text>
-            )}
-
-            <Text style={styles.zoneHeader}>🔴 Resistance Zones</Text>
-            {data.zones?.resistance?.length ? (
-              data.zones.resistance.map((z: any, i: number) => (
-                <View key={`res-${i}`} style={styles.zoneRow}>
-                  <Text style={styles.zoneStrike}>Strike {z.strike}</Text>
-                  <Text style={styles.zoneMeta}>
-                    CALL OI: {z.call_oi.toLocaleString()} (
-                    {z.call_oi_change >= 0 ? '+' : ''}
-                    {z.call_oi_change.toLocaleString()})
-                  </Text>
-                  <Text style={styles.zoneMeta}>
-                    PUT OI: {z.put_oi.toLocaleString()} (
-                    {z.put_oi_change >= 0 ? '+' : ''}
-                    {z.put_oi_change.toLocaleString()})
-                  </Text>
-                </View>
-              ))
-            ) : (
-              <Text style={styles.muted}>No resistance zones available</Text>
-            )}
-          </View>
-        )}
-
-        {/* FOOTER */}
-        <View style={styles.footer}>
-          <Text style={styles.timestamp}>{data.timestamp}</Text>
-          <Text style={styles.disclaimer}>
-            ⚠️ Educational purpose only. Not financial advice.
-          </Text>
-        </View>
-
-        <View style={{ height: 40 }} />
-      </ScrollView>
-    </View>
+      <Text style={styles.footer}>
+        ℹ️ Strike-wise storage information only. No trading advice.
+      </Text>
+    </ScrollView>
   );
 }
 
-/* ---------------- STYLES ---------------- */
+/* ===================== STYLES ===================== */
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingEmoji: { fontSize: 50 },
-  loadingText: { marginTop: 10, color: '#64748B' },
-  errorEmoji: { fontSize: 50 },
-  errorText: { fontSize: 18, fontWeight: '700' },
-  retryButton: {
-    marginTop: 16,
-    backgroundColor: '#6366F1',
-    padding: 12,
-    borderRadius: 10,
-  },
-  retryButtonText: { color: '#fff', fontWeight: '700' },
-  header: {
-    padding: 24,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    backgroundColor: '#0F172A',
-  },
-  headerTitle: { fontSize: 28, fontWeight: '800', color: '#fff' },
-  headerSubtitle: { color: '#CBD5E1' },
-  proBanner: {
-    margin: 16,
-    backgroundColor: '#FEF3C7',
-    padding: 14,
-    borderRadius: 12,
-  },
-  proText: { textAlign: 'center', fontWeight: '800', color: '#92400E' },
-  selectorContainer: {
-    flexDirection: 'row',
-    margin: 16,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 12,
-    padding: 4,
-  },
-  selectorButton: { flex: 1, padding: 10, alignItems: 'center' },
-  selectorActive: { backgroundColor: '#fff', borderRadius: 8 },
-  selectorText: { color: '#64748B' },
-  selectorTextActive: { color: '#6366F1', fontWeight: '700' },
-  viewModeToggle: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 12,
-    padding: 4,
-  },
-  viewModeButton: { flex: 1, padding: 8, alignItems: 'center' },
-  viewModeActive: { backgroundColor: '#fff', borderRadius: 8 },
-  viewModeText: { fontSize: 12, color: '#64748B' },
-  viewModeTextActive: { color: '#6366F1', fontWeight: '700' },
+  container: { flex: 1, backgroundColor: '#0f172a', padding: 16 },
+  loading: { color: '#94a3b8', textAlign: 'center', marginTop: 100 },
+  header: { marginBottom: 20 },
+  symbol: { fontSize: 22, fontWeight: '700', color: '#fff' },
+  price: { fontSize: 34, fontWeight: '800', color: '#22c55e' },
+  outlook: { color: '#94a3b8', marginTop: 4 },
+  timestamp: { fontSize: 12, color: '#64748b', marginTop: 4 },
+  sectionTitle: { marginTop: 20, fontSize: 20, fontWeight: '700', color: '#e5e7eb' },
+  zoneSummary: { color: '#94a3b8', marginVertical: 6, textAlign: 'center' },
   card: {
-    margin: 16,
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 16,
-    alignItems: 'center',
+    backgroundColor: '#020617',
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: '#1e293b',
   },
-  indexLabel: { color: '#6366F1', fontWeight: '700' },
-  spotPrice: { fontSize: 30, fontWeight: '900' },
-  liveText: { color: '#10B981', fontWeight: '700' },
-  biasCard: {
-    margin: 16,
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 2,
-    alignItems: 'center',
-  },
-  biasEmoji: { fontSize: 32 },
-  biasTitle: { fontSize: 22, fontWeight: '900' },
-  confidenceText: { color: '#64748B', fontWeight: '700' },
-  section: { margin: 16 },
-  sectionTitle: { fontSize: 18, fontWeight: '800' },
-  zoneHeader: { marginTop: 16, fontWeight: '800' },
-  zoneRow: {
-    marginTop: 10,
-    padding: 12,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 10,
-  },
-  zoneStrike: { fontWeight: '900', marginBottom: 4 },
-  zoneMeta: { fontSize: 13, color: '#334155' },
-  muted: { color: '#64748B', fontStyle: 'italic' },
-  footer: { margin: 16 },
-  timestamp: { textAlign: 'center', color: '#64748B' },
-  disclaimer: {
-    marginTop: 8,
-    textAlign: 'center',
-    backgroundColor: '#FEF3C7',
-    padding: 10,
-    borderRadius: 8,
-  },
+  strike: { fontSize: 22, fontWeight: '700', color: '#f8fafc' },
+  label: { marginTop: 4, color: '#a5f3fc' },
+  details: { marginTop: 12, borderTopWidth: 1, borderTopColor: '#1e293b', paddingTop: 8 },
+  note: { marginTop: 6, fontSize: 12, color: '#cbd5e1', textAlign: 'center' },
+  footer: { marginTop: 24, fontSize: 12, color: '#64748b', textAlign: 'center' },
 });
