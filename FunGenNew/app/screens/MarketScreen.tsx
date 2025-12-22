@@ -46,7 +46,7 @@ type MarketData = {
 /* ===================== CONFIG ===================== */
 
 const API_URL =
-  'https://drive.google.com/uc?export=download&id=1Je1mwoLqxhULWpuNknkyz6X-gg9IloVt';
+  'https://drive.google.com/file/d/1t9fYO6ry9igdt3DZqlBqakMArBA4CdUK';
 
 const REFRESH_INTERVAL_MS = 60000;
 
