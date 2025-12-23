@@ -2,6 +2,11 @@ name: Android Build (APK + AAB)
 
 on:
   workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to build'
+        required: true
+        default: 'main'
 
 jobs:
   android-build:
@@ -16,8 +21,11 @@ jobs:
       # -------------------------
       # Checkout code
       # -------------------------
-      - name: Checkout repository
+      - name: Checkout selected branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+
 
       # -------------------------
       # Node.js
