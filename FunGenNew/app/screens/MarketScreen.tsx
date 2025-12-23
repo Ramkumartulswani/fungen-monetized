@@ -1,18 +1,23 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  Animated,
+  ActivityIndicator,
   Dimensions,
+  Animated,
+  RefreshControl,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 
-// 🔁 Replace with remote fetch later
-import MarketData from '../data/market/NiftyMarket.json';
-
 const { width } = Dimensions.get('window');
+
+// Google Drive URLs
+const MARKET_URLS = {
+  NIFTY: 'https://drive.google.com/uc?export=download&id=1t9fYO6ry9igdt3DZqlBqakMArBA4CdUK',
+  BANKNIFTY: 'https://drive.google.com/uc?export=download&id=1Yj0AtywQaR-RW0ofrOpw7p8Yi1S66WVa',
+};
 
 /* ---------------- HELPERS ---------------- */
 
@@ -60,25 +65,97 @@ const PulseIndicator = ({ color }: { color: string }) => {
 };
 
 export default function MarketScreen() {
-  const d: any = MarketData;
+  const [marketData, setMarketData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const slideAnim = React.useRef(new Animated.Value(50)).current;
 
-  React.useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        tension: 20,
-        friction: 7,
-        useNativeDriver: true,
-      }),
-    ]).start();
+  useEffect(() => {
+    fetchMarketData();
   }, []);
+
+  useEffect(() => {
+    if (marketData) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          tension: 20,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [marketData]);
+
+  const fetchMarketData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await fetch(MARKET_URLS.NIFTY);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setMarketData(data);
+    } catch (err) {
+      console.error('Error fetching market data:', err);
+      setError('Failed to load market data. Pull to refresh.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchMarketData();
+    setRefreshing(false);
+  };
+
+  if (loading && !marketData) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#10B981" />
+        <Text style={styles.loadingText}>Loading market data...</Text>
+      </View>
+    );
+  }
+
+  if (error && !marketData) {
+    return (
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.centerContainer}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        <Text style={styles.errorEmoji}>📡</Text>
+        <Text style={styles.errorText}>{error}</Text>
+        <Text style={styles.errorHint}>Pull down to retry</Text>
+      </ScrollView>
+    );
+  }
+
+  if (!marketData) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.errorText}>No data available</Text>
+      </View>
+    );
+  }
+
+  const d = marketData;
 
   /* ---------------- MARKET STATUS ---------------- */
 
@@ -96,7 +173,13 @@ export default function MarketScreen() {
   /* ---------------- UI ---------------- */
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView 
+      style={styles.container} 
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
       <Animated.View
         style={{
           opacity: fadeAnim,
@@ -310,6 +393,39 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+  },
+
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+
+  errorEmoji: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+
+  errorText: {
+    fontSize: 16,
+    color: '#DC2626',
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+
+  errorHint: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '600',
   },
 
   /* HERO SECTION */
