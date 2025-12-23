@@ -275,6 +275,14 @@ export default function MarketScreen() {
           transform: [{ translateY: slideAnim }],
         }}
       >
+        {/* ⚠️ DISCLAIMER */}
+        <View style={styles.disclaimer}>
+          <Text style={styles.disclaimerIcon}>⚠️</Text>
+          <Text style={styles.disclaimerText}>
+            <Text style={styles.disclaimerBold}>Educational Purpose Only:</Text> This data is for learning and informational purposes only. We do not provide any trading or investment advice. Please consult a certified financial advisor before making any investment decisions.
+          </Text>
+        </View>
+
         {/* 🔄 AUTO REFRESH STATUS BAR */}
         <View style={styles.statusBar}>
           <View style={styles.statusLeft}>
@@ -539,6 +547,39 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#64748B',
     fontWeight: '600',
+  },
+
+  /* DISCLAIMER */
+  disclaimer: {
+    backgroundColor: '#FEF3C7',
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 4,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#FDE047',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+
+  disclaimerIcon: {
+    fontSize: 18,
+    marginTop: 2,
+  },
+
+  disclaimerText: {
+    flex: 1,
+    fontSize: 11,
+    lineHeight: 16,
+    color: '#92400E',
+    fontWeight: '600',
+  },
+
+  disclaimerBold: {
+    fontWeight: '900',
+    color: '#78350F',
   },
 
   /* STATUS BAR */
