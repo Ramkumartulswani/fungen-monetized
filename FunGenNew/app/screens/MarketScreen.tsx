@@ -1,293 +1,660 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ActivityIndicator,
-  RefreshControl,
   ScrollView,
-  TouchableOpacity,
-  Platform,
+  Animated,
+  Dimensions,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import LinearGradient from 'react-native-linear-gradient';
 
-const MARKET_URLS: any = {
-  NIFTY:
-    'https://drive.google.com/uc?export=download&id=1t9fYO6ry9igdt3DZqlBqakMArBA4CdUK',
-  BANKNIFTY:
-    'https://drive.google.com/uc?export=download&id=1Yj0AtywQaR-RW0ofrOpw7p8Yi1S66WVa',
+// 🔁 Replace with remote fetch later
+import MarketData from '../data/market/NiftyMarket.json';
+
+const { width } = Dimensions.get('window');
+
+/* ---------------- HELPERS ---------------- */
+
+const getStrength = (pct: number) => {
+  if (pct >= 40) return { arrow: '▲▲', label: 'STRONG', color: '#DC2626', bg: '#FEE2E2' };
+  if (pct >= 20) return { arrow: '▲', label: 'BUILDING', color: '#EF4444', bg: '#FEE2E2' };
+  if (pct <= -30) return { arrow: '▼▼', label: 'UNWINDING', color: '#64748B', bg: '#F1F5F9' };
+  if (pct < 0) return { arrow: '▼', label: 'WEAK', color: '#94A3B8', bg: '#F1F5F9' };
+  return { arrow: '→', label: 'NEUTRAL', color: '#6B7280', bg: '#F3F4F6' };
+};
+
+const PulseIndicator = ({ color }: { color: string }) => {
+  const pulseAnim = React.useRef(new Animated.Value(1)).current;
+
+  React.useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
+  return (
+    <Animated.View
+      style={[
+        styles.pulseOuter,
+        { 
+          backgroundColor: color + '30',
+          transform: [{ scale: pulseAnim }],
+        },
+      ]}
+    >
+      <View style={[styles.pulseInner, { backgroundColor: color }]} />
+    </Animated.View>
+  );
 };
 
 export default function MarketScreen() {
-  const navigation = useNavigation();
+  const d: any = MarketData;
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const slideAnim = React.useRef(new Animated.Value(50)).current;
 
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState<'NIFTY' | 'BANKNIFTY'>(
-    'NIFTY'
-  );
-  const [viewMode, setViewMode] = useState<'overview' | 'detailed' | 'zones'>(
-    'overview'
-  );
+  React.useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 20,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
-  useEffect(() => {
-    fetchMarketData();
-  }, [selectedIndex]);
+  /* ---------------- MARKET STATUS ---------------- */
 
-  const fetchMarketData = async () => {
-    try {
-      setError(false);
-      const url = MARKET_URLS[selectedIndex] + '&t=' + Date.now();
-      const res = await fetch(url);
-      const json = await res.json();
-      setData(json);
-    } catch (e) {
-      console.error(e);
-      setError(true);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  const isBullish = d.final_decision.bias === 'BULLISH';
+  const isBearish = d.final_decision.bias === 'BEARISH';
 
-  const formatNumber = (num: number) =>
-    new Intl.NumberFormat('en-IN', { notation: 'compact' }).format(num);
+  const statusColors = isBullish
+    ? ['#10B981', '#059669', '#047857']
+    : isBearish
+    ? ['#EF4444', '#DC2626', '#B91C1C']
+    : ['#6B7280', '#4B5563', '#374151'];
 
-  const formatPrice = (price: number) =>
-    new Intl.NumberFormat('en-IN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(price);
+  const accentColor = isBullish ? '#10B981' : isBearish ? '#EF4444' : '#6B7280';
 
-  /* ---------- LOADING ---------- */
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.loadingEmoji}>📊</Text>
-        <ActivityIndicator size="large" color="#6366F1" />
-        <Text style={styles.loadingText}>Loading market data…</Text>
-      </View>
-    );
-  }
-
-  /* ---------- ERROR ---------- */
-  if (error || !data) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.errorEmoji}>📉</Text>
-        <Text style={styles.errorText}>Connection Lost</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={fetchMarketData}>
-          <Text style={styles.retryButtonText}>🔄 Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  const bias = data.final_decision.bias;
-  const biasColor =
-    bias === 'BULLISH' ? '#10B981' : bias === 'BEARISH' ? '#EF4444' : '#6B7280';
-  const biasEmoji = bias === 'BULLISH' ? '🐂' : bias === 'BEARISH' ? '🐻' : '⚖️';
+  /* ---------------- UI ---------------- */
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              fetchMarketData();
-            }}
-            tintColor="#6366F1"
-          />
-        }
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <Animated.View
+        style={{
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        }}
       >
-        {/* HEADER */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>📊 Market Pulse</Text>
-          <Text style={styles.headerSubtitle}>Live Options Analysis</Text>
-        </View>
-
-        {/* MARKET PRO CTA (SAFE) */}
-        <TouchableOpacity
-          style={styles.proBanner}
-          onPress={() => navigation.navigate('MarketPaywall' as never)}
+        {/* 🔥 MARKET STATUS HERO */}
+        <LinearGradient 
+          colors={statusColors} 
+          style={styles.hero}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
         >
-          <Text style={styles.proText}>
-            ⭐ Unlock Market Pro – ₹49 / month
-          </Text>
-        </TouchableOpacity>
-
-        {/* INDEX SELECTOR */}
-        <View style={styles.selectorContainer}>
-          {['NIFTY', 'BANKNIFTY'].map(idx => (
-            <TouchableOpacity
-              key={idx}
-              style={[
-                styles.selectorButton,
-                selectedIndex === idx && styles.selectorActive,
-              ]}
-              onPress={() => setSelectedIndex(idx as any)}
-            >
-              <Text
-                style={[
-                  styles.selectorText,
-                  selectedIndex === idx && styles.selectorTextActive,
-                ]}
-              >
-                {idx}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* VIEW MODE */}
-        <View style={styles.viewModeToggle}>
-          {['overview', 'detailed', 'zones'].map(mode => (
-            <TouchableOpacity
-              key={mode}
-              style={[
-                styles.viewModeButton,
-                viewMode === mode && styles.viewModeActive,
-              ]}
-              onPress={() => setViewMode(mode as any)}
-            >
-              <Text
-                style={[
-                  styles.viewModeText,
-                  viewMode === mode && styles.viewModeTextActive,
-                ]}
-              >
-                {mode.toUpperCase()}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* PRICE CARD */}
-        <View style={styles.card}>
-          <Text style={styles.indexLabel}>{data.index}</Text>
-          <Text style={styles.spotPrice}>
-            ₹{formatPrice(data.spot_price)}
-          </Text>
-          <Text style={styles.liveText}>LIVE</Text>
-        </View>
-
-        {/* BIAS */}
-        <View style={[styles.biasCard, { borderColor: biasColor }]}>
-          <Text style={styles.biasEmoji}>{biasEmoji}</Text>
-          <Text style={[styles.biasTitle, { color: biasColor }]}>{bias}</Text>
-          <Text style={styles.confidenceText}>
-            {data.final_decision.confidence} CONFIDENCE
-          </Text>
-        </View>
-
-        {/* OVERVIEW */}
-        {viewMode === 'overview' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>📊 Key Indicators</Text>
-            <Text>PCR: {data.key_indicators.pcr_oi.toFixed(2)}</Text>
-            <Text>ATM PCR: {data.key_indicators.atm_pcr.toFixed(2)}</Text>
+          {/* Decorative background circles */}
+          <View style={styles.heroDecor}>
+            <View style={[styles.decorCircle, styles.decorCircle1]} />
+            <View style={[styles.decorCircle, styles.decorCircle2]} />
           </View>
-        )}
 
-        {/* FOOTER */}
-        <View style={styles.footer}>
-          <Text style={styles.timestamp}>{data.timestamp}</Text>
-          <Text style={styles.disclaimer}>
-            ⚠️ Educational purpose only. Not financial advice.
-          </Text>
+          <View style={styles.heroContent}>
+            <View style={styles.heroTop}>
+              <PulseIndicator color="#fff" />
+              <Text style={styles.heroEmoji}>{d.final_decision.bias_symbol}</Text>
+            </View>
+            
+            <Text style={styles.heroTitle}>
+              {d.final_decision.bias} PRESSURE
+            </Text>
+            
+            <View style={styles.heroBadge}>
+              <Text style={styles.heroBadgeText}>
+                {d.parallel_oi_analysis.cross_strike_analysis.bias_interpretation}
+              </Text>
+            </View>
+            
+            <View style={styles.heroFooter}>
+              <View style={styles.confidenceMeter}>
+                <View style={styles.confidenceLabel}>
+                  <Text style={styles.confidenceLabelText}>CONFIDENCE</Text>
+                </View>
+                <Text style={styles.confidenceValue}>{d.final_decision.confidence}</Text>
+              </View>
+            </View>
+          </View>
+        </LinearGradient>
+
+        {/* 📊 PRICE CONTEXT - Redesigned */}
+        <View style={[styles.card, styles.priceCard]}>
+          <View style={styles.priceHeader}>
+            <View>
+              <Text style={styles.priceLabel}>SPOT PRICE</Text>
+              <Text style={styles.price}>₹ {d.spot_price}</Text>
+            </View>
+            <View style={[styles.priceBadge, { borderColor: accentColor }]}>
+              <Text style={[styles.priceBadgeText, { color: accentColor }]}>LIVE</Text>
+            </View>
+          </View>
+          
+          <View style={styles.pcrRow}>
+            <View style={styles.pcrItem}>
+              <Text style={styles.pcrLabel}>PCR</Text>
+              <Text style={styles.pcrValue}>{d.key_indicators.pcr_oi}</Text>
+              <Text style={styles.pcrInterpretation}>{d.key_indicators.pcr_interpretation}</Text>
+            </View>
+            <View style={styles.divider} />
+            <View style={styles.pcrItem}>
+              <Text style={styles.pcrLabel}>ATM PCR</Text>
+              <Text style={styles.pcrValue}>{d.key_indicators.atm_pcr}</Text>
+              <Text style={styles.pcrInterpretation}>{d.key_indicators.atm_pcr_interpretation}</Text>
+            </View>
+          </View>
         </View>
+
+        {/* ⚡ OI ACTIVITY RADAR - Enhanced */}
+        <View style={styles.card}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionIcon}>⚡</Text>
+            <Text style={styles.sectionTitle}>OI Activity Radar</Text>
+          </View>
+
+          <View style={styles.radarContainer}>
+            {/* Resistance Strikes */}
+            <View style={styles.radarSection}>
+              <Text style={styles.radarSectionTitle}>RESISTANCE</Text>
+              {d.zones.resistance.map((z: any, i: number) => {
+                const s = getStrength(z.call_oi_change_pct);
+                return (
+                  <View key={`res-${i}`} style={styles.radarItem}>
+                    <View style={styles.radarLeft}>
+                      <View style={[styles.radarDot, { backgroundColor: '#DC2626' }]} />
+                      <Text style={styles.radarStrike}>{z.strike}</Text>
+                      <Text style={styles.radarType}>CE</Text>
+                    </View>
+                    <View style={[styles.radarBadge, { backgroundColor: s.bg }]}>
+                      <Text style={[styles.radarArrow, { color: s.color }]}>{s.arrow}</Text>
+                      <Text style={[styles.radarLabel, { color: s.color }]}>{s.label}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* Support Strikes */}
+            <View style={[styles.radarSection, styles.radarSectionLast]}>
+              <Text style={styles.radarSectionTitle}>SUPPORT</Text>
+              {d.zones.support.map((z: any, i: number) => {
+                const s = getStrength(z.put_oi_change_pct);
+                return (
+                  <View key={`sup-${i}`} style={styles.radarItem}>
+                    <View style={styles.radarLeft}>
+                      <View style={[styles.radarDot, { backgroundColor: '#16A34A' }]} />
+                      <Text style={styles.radarStrike}>{z.strike}</Text>
+                      <Text style={styles.radarType}>PE</Text>
+                    </View>
+                    <View style={[styles.radarBadge, { backgroundColor: s.bg }]}>
+                      <Text style={[styles.radarArrow, { color: s.color }]}>{s.arrow}</Text>
+                      <Text style={[styles.radarLabel, { color: s.color }]}>{s.label}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+
+        {/* 🎯 KEY LEVELS - Combined Support & Resistance */}
+        <View style={styles.card}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionIcon}>🎯</Text>
+            <Text style={styles.sectionTitle}>Key Levels</Text>
+          </View>
+
+          <View style={styles.levelsContainer}>
+            {/* Resistance */}
+            <View style={styles.levelSection}>
+              <View style={styles.levelHeader}>
+                <View style={styles.levelDot} />
+                <Text style={styles.levelTitle}>RESISTANCE</Text>
+              </View>
+              <View style={styles.levelChips}>
+                {d.zones.resistance.slice(0, 3).map((z: any, i: number) => (
+                  <LinearGradient
+                    key={i}
+                    colors={['#FEE2E2', '#FECACA']}
+                    style={styles.levelChip}
+                  >
+                    <Text style={styles.levelChipStrike}>{z.strike}</Text>
+                    <Text style={styles.levelChipCode}>{z.interpretation_code}</Text>
+                  </LinearGradient>
+                ))}
+              </View>
+            </View>
+
+            {/* Support */}
+            <View style={[styles.levelSection, { marginTop: 16 }]}>
+              <View style={styles.levelHeader}>
+                <View style={[styles.levelDot, { backgroundColor: '#10B981' }]} />
+                <Text style={styles.levelTitle}>SUPPORT</Text>
+              </View>
+              <View style={styles.levelChips}>
+                {d.zones.support.slice(0, 3).map((z: any, i: number) => (
+                  <LinearGradient
+                    key={i}
+                    colors={['#D1FAE5', '#A7F3D0']}
+                    style={styles.levelChip}
+                  >
+                    <Text style={styles.levelChipStrike}>{z.strike}</Text>
+                    <Text style={styles.levelChipCode}>{z.interpretation_code}</Text>
+                  </LinearGradient>
+                ))}
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* 🧠 MARKET SUMMARY */}
+        <LinearGradient
+          colors={['#F8FAFC', '#F1F5F9']}
+          style={[styles.card, styles.summaryCard]}
+        >
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionIcon}>🧠</Text>
+            <Text style={styles.sectionTitle}>Market Summary</Text>
+          </View>
+          
+          <View style={styles.summaryContent}>
+            <View style={styles.summaryBlock}>
+              <View style={styles.summaryIndicator} />
+              <Text style={styles.summaryText}>
+                {d.parallel_oi_analysis.resistance_zone.summary}
+              </Text>
+            </View>
+            <View style={[styles.summaryBlock, { marginTop: 12 }]}>
+              <View style={styles.summaryIndicator} />
+              <Text style={styles.summaryText}>
+                {d.parallel_oi_analysis.support_zone.summary}
+              </Text>
+            </View>
+          </View>
+        </LinearGradient>
 
         <View style={{ height: 40 }} />
-      </ScrollView>
-    </View>
+      </Animated.View>
+    </ScrollView>
   );
 }
 
-/* ---------- STYLES ---------- */
+/* ---------------- STYLES ---------------- */
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingEmoji: { fontSize: 50 },
-  loadingText: { marginTop: 10, color: '#64748B' },
-  errorEmoji: { fontSize: 50 },
-  errorText: { fontSize: 18, fontWeight: '700' },
-  retryButton: {
-    marginTop: 16,
-    backgroundColor: '#6366F1',
-    padding: 12,
-    borderRadius: 10,
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
   },
-  retryButtonText: { color: '#fff', fontWeight: '700' },
-  header: {
-    padding: 24,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    backgroundColor: '#0F172A',
-  },
-  headerTitle: { fontSize: 28, fontWeight: '800', color: '#fff' },
-  headerSubtitle: { color: '#CBD5E1' },
-  proBanner: {
+
+  /* HERO SECTION */
+  hero: {
     margin: 16,
-    backgroundColor: '#FEF3C7',
-    padding: 14,
-    borderRadius: 12,
+    marginTop: 8,
+    padding: 28,
+    borderRadius: 28,
+    overflow: 'hidden',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
   },
-  proText: { textAlign: 'center', fontWeight: '800', color: '#92400E' },
-  selectorContainer: {
-    flexDirection: 'row',
-    margin: 16,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 12,
-    padding: 4,
+  heroDecor: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
-  selectorButton: { flex: 1, padding: 10, alignItems: 'center' },
-  selectorActive: { backgroundColor: '#fff', borderRadius: 8 },
-  selectorText: { color: '#64748B' },
-  selectorTextActive: { color: '#6366F1', fontWeight: '700' },
-  viewModeToggle: {
+  decorCircle: {
+    position: 'absolute',
+    borderRadius: 1000,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  decorCircle1: {
+    width: 200,
+    height: 200,
+    top: -100,
+    right: -50,
+  },
+  decorCircle2: {
+    width: 150,
+    height: 150,
+    bottom: -75,
+    left: -30,
+  },
+  heroContent: {
+    position: 'relative',
+  },
+  heroTop: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  heroEmoji: { 
+    fontSize: 48,
+  },
+  heroTitle: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#fff',
+    marginTop: 12,
+    textAlign: 'center',
+    letterSpacing: 1,
+  },
+  heroBadge: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginTop: 12,
+    alignSelf: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  heroBadgeText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  heroFooter: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  confidenceMeter: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  confidenceLabel: {
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  confidenceLabelText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  confidenceValue: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+
+  /* PULSE INDICATOR */
+  pulseOuter: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pulseInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+
+  /* CARD STYLES */
+  card: {
+    backgroundColor: '#fff',
     marginHorizontal: 16,
     marginBottom: 16,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 12,
-    padding: 4,
+    padding: 20,
+    borderRadius: 24,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
   },
-  viewModeButton: { flex: 1, padding: 8, alignItems: 'center' },
-  viewModeActive: { backgroundColor: '#fff', borderRadius: 8 },
-  viewModeText: { fontSize: 12, color: '#64748B' },
-  viewModeTextActive: { color: '#6366F1', fontWeight: '700' },
-  card: {
-    margin: 16,
+
+  /* SECTION HEADERS */
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionIcon: {
+    fontSize: 24,
+    marginRight: 8,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#1E293B',
+  },
+
+  /* PRICE CARD */
+  priceCard: {
     backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 16,
-    alignItems: 'center',
   },
-  indexLabel: { color: '#6366F1', fontWeight: '700' },
-  spotPrice: { fontSize: 30, fontWeight: '900' },
-  liveText: { color: '#10B981', fontWeight: '700' },
-  biasCard: {
-    margin: 16,
-    padding: 20,
-    borderRadius: 16,
+  priceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+  },
+  priceLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  price: {
+    fontSize: 36,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+  priceBadge: {
     borderWidth: 2,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  priceBadgeText: {
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  pcrRow: {
+    flexDirection: 'row',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 16,
+  },
+  pcrItem: {
+    flex: 1,
     alignItems: 'center',
   },
-  biasEmoji: { fontSize: 32 },
-  biasTitle: { fontSize: 22, fontWeight: '900' },
-  confidenceText: { color: '#64748B', fontWeight: '700' },
-  section: { margin: 16 },
-  sectionTitle: { fontSize: 18, fontWeight: '800' },
-  footer: { margin: 16 },
-  timestamp: { textAlign: 'center', color: '#64748B' },
-  disclaimer: {
+  pcrLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    marginBottom: 4,
+  },
+  pcrValue: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  pcrInterpretation: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  divider: {
+    width: 1,
+    backgroundColor: '#E2E8F0',
+    marginHorizontal: 16,
+  },
+
+  /* RADAR SECTION */
+  radarContainer: {
+    gap: 16,
+  },
+  radarSection: {
+    borderTopWidth: 2,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 12,
+  },
+  radarSectionLast: {
     marginTop: 8,
-    textAlign: 'center',
-    backgroundColor: '#FEF3C7',
-    padding: 10,
-    borderRadius: 8,
+  },
+  radarSectionTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  radarItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  radarLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  radarDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  radarStrike: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+  radarType: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  radarBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    gap: 6,
+  },
+  radarArrow: {
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  radarLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+
+  /* LEVELS SECTION */
+  levelsContainer: {},
+  levelSection: {},
+  levelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  levelDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#EF4444',
+  },
+  levelTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.5,
+  },
+  levelChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  levelChip: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    minWidth: 100,
+  },
+  levelChipStrike: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+  levelChipCode: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    marginTop: 2,
+  },
+
+  /* SUMMARY CARD */
+  summaryCard: {
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+  },
+  summaryContent: {},
+  summaryBlock: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  summaryIndicator: {
+    width: 4,
+    backgroundColor: '#3B82F6',
+    borderRadius: 2,
+    marginTop: 2,
+  },
+  summaryText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 22,
+    color: '#475569',
+    fontWeight: '600',
   },
 });
