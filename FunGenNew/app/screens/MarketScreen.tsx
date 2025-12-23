@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Dimensions,
   Animated,
   RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 
@@ -19,6 +20,9 @@ const MARKET_URLS = {
   BANKNIFTY: 'https://drive.google.com/uc?export=download&id=1Yj0AtywQaR-RW0ofrOpw7p8Yi1S66WVa',
 };
 
+// Auto-refresh interval (in milliseconds)
+const AUTO_REFRESH_INTERVAL = 30000; // 30 seconds
+
 /* ---------------- HELPERS ---------------- */
 
 const getStrength = (pct: number) => {
@@ -29,10 +33,18 @@ const getStrength = (pct: number) => {
   return { arrow: '→', label: 'NEUTRAL', color: '#6B7280', bg: '#F3F4F6' };
 };
 
-const PulseIndicator = ({ color }: { color: string }) => {
-  const pulseAnim = React.useRef(new Animated.Value(1)).current;
+const formatTime = (date: Date) => {
+  return date.toLocaleTimeString('en-US', { 
+    hour: '2-digit', 
+    minute: '2-digit',
+    second: '2-digit'
+  });
+};
 
-  React.useEffect(() => {
+const PulseIndicator = ({ color }: { color: string }) => {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
@@ -69,13 +81,40 @@ export default function MarketScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [countdown, setCountdown] = useState(AUTO_REFRESH_INTERVAL / 1000);
   
-  const fadeAnim = React.useRef(new Animated.Value(0)).current;
-  const slideAnim = React.useRef(new Animated.Value(50)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     fetchMarketData();
+    
+    // Cleanup on unmount
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+      }
+    };
   }, []);
+
+  useEffect(() => {
+    if (autoRefreshEnabled) {
+      startAutoRefresh();
+    } else {
+      stopAutoRefresh();
+    }
+    
+    return () => {
+      stopAutoRefresh();
+    };
+  }, [autoRefreshEnabled]);
 
   useEffect(() => {
     if (marketData) {
@@ -95,12 +134,50 @@ export default function MarketScreen() {
     }
   }, [marketData]);
 
-  const fetchMarketData = async () => {
+  const startAutoRefresh = () => {
+    // Clear any existing intervals
+    stopAutoRefresh();
+    
+    // Start auto-refresh interval
+    refreshIntervalRef.current = setInterval(() => {
+      fetchMarketData(true); // Silent refresh
+    }, AUTO_REFRESH_INTERVAL);
+    
+    // Start countdown interval
+    setCountdown(AUTO_REFRESH_INTERVAL / 1000);
+    countdownIntervalRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          return AUTO_REFRESH_INTERVAL / 1000;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const stopAutoRefresh = () => {
+    if (refreshIntervalRef.current) {
+      clearInterval(refreshIntervalRef.current);
+      refreshIntervalRef.current = null;
+    }
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+  };
+
+  const fetchMarketData = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       setError(null);
       
-      const response = await fetch(MARKET_URLS.NIFTY);
+      const response = await fetch(MARKET_URLS.NIFTY, {
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -108,11 +185,19 @@ export default function MarketScreen() {
       
       const data = await response.json();
       setMarketData(data);
+      setLastUpdated(new Date());
+      
+      // Reset countdown
+      if (autoRefreshEnabled) {
+        setCountdown(AUTO_REFRESH_INTERVAL / 1000);
+      }
     } catch (err) {
       console.error('Error fetching market data:', err);
-      setError('Failed to load market data. Pull to refresh.');
+      setError('Failed to load market data');
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -120,6 +205,10 @@ export default function MarketScreen() {
     setRefreshing(true);
     await fetchMarketData();
     setRefreshing(false);
+  };
+
+  const toggleAutoRefresh = () => {
+    setAutoRefreshEnabled(!autoRefreshEnabled);
   };
 
   if (loading && !marketData) {
@@ -186,6 +275,30 @@ export default function MarketScreen() {
           transform: [{ translateY: slideAnim }],
         }}
       >
+        {/* 🔄 AUTO REFRESH STATUS BAR */}
+        <View style={styles.statusBar}>
+          <View style={styles.statusLeft}>
+            <View style={[styles.statusDot, { 
+              backgroundColor: autoRefreshEnabled ? '#10B981' : '#94A3B8' 
+            }]} />
+            <Text style={styles.statusText}>
+              {lastUpdated ? `Updated ${formatTime(lastUpdated)}` : 'Fetching...'}
+            </Text>
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.refreshButton}
+            onPress={toggleAutoRefresh}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.refreshButtonText, {
+              color: autoRefreshEnabled ? '#10B981' : '#94A3B8'
+            }]}>
+              {autoRefreshEnabled ? `🔄 ${countdown}s` : '⏸ Paused'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* 🔥 MARKET STATUS HERO */}
         <LinearGradient 
           colors={statusColors} 
@@ -226,7 +339,7 @@ export default function MarketScreen() {
           </View>
         </LinearGradient>
 
-        {/* 📊 PRICE CONTEXT - Redesigned */}
+        {/* 📊 PRICE CONTEXT */}
         <View style={[styles.card, styles.priceCard]}>
           <View style={styles.priceHeader}>
             <View>
@@ -253,7 +366,7 @@ export default function MarketScreen() {
           </View>
         </View>
 
-        {/* ⚡ OI ACTIVITY RADAR - Enhanced */}
+        {/* ⚡ OI ACTIVITY RADAR */}
         <View style={styles.card}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionIcon}>⚡</Text>
@@ -305,7 +418,7 @@ export default function MarketScreen() {
           </View>
         </View>
 
-        {/* 🎯 KEY LEVELS - Combined Support & Resistance */}
+        {/* 🎯 KEY LEVELS */}
         <View style={styles.card}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionIcon}>🎯</Text>
@@ -428,10 +541,59 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  /* STATUS BAR */
+  statusBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 8,
+    borderRadius: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+  },
+
+  statusLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+
+  statusText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+
+  refreshButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+  },
+
+  refreshButtonText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+
   /* HERO SECTION */
   hero: {
     margin: 16,
-    marginTop: 8,
+    marginTop: 0,
     padding: 28,
     borderRadius: 28,
     overflow: 'hidden',
