@@ -1,203 +1,379 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
+  ActivityIndicator,
+  RefreshControl,
   ScrollView,
   TouchableOpacity,
-  LayoutAnimation,
   Platform,
-  UIManager,
-  RefreshControl,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 
-if (Platform.OS === 'android') {
-  UIManager.setLayoutAnimationEnabledExperimental?.(true);
-}
+// Feature flags
+import { getFeatureFlags } from '../utils/featureFlags';
 
-/* ===================== TYPES ===================== */
-
-type Zone = {
-  strike: number;
-  call_oi: number;
-  call_oi_change_pct: number;
-  put_oi: number;
-  put_oi_change_pct: number;
-  interpretation: string;
-  interpretation_code: string;
+const MARKET_URLS: any = {
+  NIFTY:
+    'https://drive.google.com/uc?export=download&id=1t9fYO6ry9igdt3DZqlBqakMArBA4CdUK',
+  BANKNIFTY:
+    'https://drive.google.com/uc?export=download&id=1Yj0AtywQaR-RW0ofrOpw7p8Yi1S66WVa',
 };
-
-type MarketData = {
-  spot_price: number;
-  market_outlook: {
-    direction_symbol: string;
-    confidence: string;
-  };
-  zones: {
-    support: Zone[];
-    resistance: Zone[];
-  };
-  parallel_oi_analysis: {
-    support_zone: { summary: string };
-    resistance_zone: { summary: string };
-  };
-};
-
-/* ===================== CONFIG ===================== */
-
-const API_URL =
-  'https://drive.google.com/file/d/1t9fYO6ry9igdt3DZqlBqakMArBA4CdUK';
-
-const REFRESH_INTERVAL_MS = 60000;
-
-/* ===================== HELPERS ===================== */
-
-const getStorageLabel = (z: Zone, isSupport: boolean) => {
-  const c = z.interpretation_code;
-  if (isSupport) {
-    if (c === 'STRONG_BUY') return '🟢🟢 STRONG SUPPORT';
-    if (c === 'HEAVY_SUPPORT') return '🟢 SUPPORT BUILDING';
-  } else {
-    if (c === 'STRONG_SELL') return '🔴🔴 STRONG RESISTANCE';
-    if (c === 'HEAVY_RESISTANCE') return '🔴 RESISTANCE BUILDING';
-  }
-  return '🟡 RANGE';
-};
-
-const format = (n: number) =>
-  Math.abs(n) > 1e5 ? (n / 1e5).toFixed(2) + 'L' : n.toFixed(0);
-
-/* ===================== SCREEN ===================== */
 
 export default function MarketScreen() {
-  const [data, setData] = useState<MarketData | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const navigation = useNavigation();
+
+  /* ---------------- STATE ---------------- */
+  const [showProBanner, setShowProBanner] = useState(true);
+
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [expanded, setExpanded] = useState<Record<number, boolean>>({});
-  const fetching = useRef(false);
+  const [error, setError] = useState(false);
 
-  const fetchData = async () => {
-    if (fetching.current) return;
-    fetching.current = true;
+  const [selectedIndex, setSelectedIndex] =
+    useState<'NIFTY' | 'BANKNIFTY'>('NIFTY');
 
+  const [viewMode, setViewMode] =
+    useState<'overview' | 'zones'>('overview');
+
+  /* ---------------- FETCH DATA ---------------- */
+  useEffect(() => {
+    fetchMarketData();
+  }, [selectedIndex]);
+
+  /* ---------------- FEATURE FLAGS ---------------- */
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const flags = await getFeatureFlags();
+        if (mounted) {
+          setShowProBanner(flags.showMarketProBanner);
+        }
+      } catch {}
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const fetchMarketData = async () => {
     try {
-      const res = await fetch(API_URL);
-      const text = await res.text();
-
-      // 🔴 Detect Google Drive HTML response
-      if (text.startsWith('<!DOCTYPE html')) {
-        throw new Error('Invalid JSON (Drive HTML received)');
-      }
-
-      const json: MarketData = JSON.parse(text);
-
-      if (!json?.zones?.support || !json?.zones?.resistance) {
-        throw new Error('Malformed market JSON');
-      }
-
+      setError(false);
+      const url = MARKET_URLS[selectedIndex] + '&t=' + Date.now();
+      const res = await fetch(url);
+      const json = await res.json();
       setData(json);
-      setError(null);
-    } catch (e: any) {
-      console.error('MarketScreen error:', e);
-      setError(e.message);
+    } catch (e) {
+      console.error(e);
+      setError(true);
     } finally {
-      fetching.current = false;
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-    const t = setInterval(fetchData, REFRESH_INTERVAL_MS);
-    return () => clearInterval(t);
-  }, []);
+  const formatPrice = (price: number) =>
+    new Intl.NumberFormat('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(price);
 
-  const toggle = (s: number) => {
-    LayoutAnimation.easeInEaseOut();
-    setExpanded(p => ({ ...p, [s]: !p[s] }));
-  };
-
-  if (error) {
+  /* ---------------- LOADING ---------------- */
+  if (loading) {
     return (
       <View style={styles.center}>
-        <Text style={styles.error}>⚠️ {error}</Text>
+        <Text style={styles.loadingEmoji}>📊</Text>
+        <ActivityIndicator size="large" color="#6366F1" />
+        <Text style={styles.loadingText}>Loading market data…</Text>
       </View>
     );
   }
 
-  if (!data) {
+  /* ---------------- ERROR ---------------- */
+  if (error || !data) {
     return (
       <View style={styles.center}>
-        <Text style={styles.loading}>Loading market data…</Text>
+        <Text style={styles.errorEmoji}>📉</Text>
+        <Text style={styles.errorText}>Connection Lost</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={fetchMarketData}>
+          <Text style={styles.retryButtonText}>🔄 Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
+
+  const bias = data.final_decision.bias;
+  const biasColor =
+    bias === 'BULLISH' ? '#10B981' :
+    bias === 'BEARISH' ? '#EF4444' : '#6B7280';
+  const biasEmoji =
+    bias === 'BULLISH' ? '🐂' :
+    bias === 'BEARISH' ? '🐻' : '⚖️';
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={fetchData} />
-      }
-    >
-      <Text style={styles.title}>NIFTY · ₹{data.spot_price}</Text>
-      <Text style={styles.sub}>
-        {data.market_outlook.direction_symbol} · {data.market_outlook.confidence}
-      </Text>
+    <View style={styles.container}>
+      <ScrollView
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              fetchMarketData();
+            }}
+            tintColor="#6366F1"
+          />
+        }
+      >
+        {/* HEADER */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>📊 Market Pulse</Text>
+          <Text style={styles.headerSubtitle}>Live Options Analysis</Text>
+        </View>
 
-      <Text style={styles.section}>🟢 Support</Text>
-      <Text style={styles.summary}>
-        {data.parallel_oi_analysis.support_zone.summary}
-      </Text>
-
-      {data.zones.support.map(z => (
-        <TouchableOpacity key={z.strike} style={styles.card} onPress={() => toggle(z.strike)}>
-          <Text style={styles.strike}>{z.strike}</Text>
-          <Text>{getStorageLabel(z, true)}</Text>
-          {expanded[z.strike] && (
-            <Text style={styles.detail}>
-              Put OI: {format(z.put_oi)} ({z.put_oi_change_pct}%)
+        {/* PRO BANNER */}
+        {showProBanner && (
+          <TouchableOpacity
+            style={styles.proBanner}
+            onPress={() => navigation.navigate('MarketPaywall' as never)}
+          >
+            <Text style={styles.proText}>
+              ⭐ Unlock Market Pro – ₹49 / month
             </Text>
-          )}
-        </TouchableOpacity>
-      ))}
+          </TouchableOpacity>
+        )}
 
-      <Text style={styles.section}>🔴 Resistance</Text>
-      <Text style={styles.summary}>
-        {data.parallel_oi_analysis.resistance_zone.summary}
-      </Text>
+        {/* INDEX SELECTOR */}
+        <View style={styles.selectorContainer}>
+          {['NIFTY', 'BANKNIFTY'].map(idx => (
+            <TouchableOpacity
+              key={idx}
+              style={[
+                styles.selectorButton,
+                selectedIndex === idx && styles.selectorActive,
+              ]}
+              onPress={() => setSelectedIndex(idx as any)}
+            >
+              <Text
+                style={[
+                  styles.selectorText,
+                  selectedIndex === idx && styles.selectorTextActive,
+                ]}
+              >
+                {idx}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-      {data.zones.resistance.map(z => (
-        <TouchableOpacity key={z.strike} style={styles.card} onPress={() => toggle(z.strike)}>
-          <Text style={styles.strike}>{z.strike}</Text>
-          <Text>{getStorageLabel(z, false)}</Text>
-          {expanded[z.strike] && (
-            <Text style={styles.detail}>
-              Call OI: {format(z.call_oi)} ({z.call_oi_change_pct}%)
-            </Text>
-          )}
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
+        {/* VIEW MODE */}
+        <View style={styles.viewModeToggle}>
+          {['overview', 'zones'].map(mode => (
+            <TouchableOpacity
+              key={mode}
+              style={[
+                styles.viewModeButton,
+                viewMode === mode && styles.viewModeActive,
+              ]}
+              onPress={() => setViewMode(mode as any)}
+            >
+              <Text
+                style={[
+                  styles.viewModeText,
+                  viewMode === mode && styles.viewModeTextActive,
+                ]}
+              >
+                {mode.toUpperCase()}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* PRICE CARD */}
+        <View style={styles.card}>
+          <Text style={styles.indexLabel}>{data.index}</Text>
+          <Text style={styles.spotPrice}>
+            ₹{formatPrice(data.spot_price)}
+          </Text>
+          <Text style={styles.liveText}>LIVE</Text>
+        </View>
+
+        {/* BIAS */}
+        <View style={[styles.biasCard, { borderColor: biasColor }]}>
+          <Text style={styles.biasEmoji}>{biasEmoji}</Text>
+          <Text style={[styles.biasTitle, { color: biasColor }]}>
+            {bias}
+          </Text>
+          <Text style={styles.confidenceText}>
+            {data.final_decision.confidence} CONFIDENCE
+          </Text>
+        </View>
+
+        {/* OVERVIEW */}
+        {viewMode === 'overview' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>📊 Key Indicators</Text>
+            <Text>PCR: {data.key_indicators.pcr_oi.toFixed(2)}</Text>
+            <Text>ATM PCR: {data.key_indicators.atm_pcr.toFixed(2)}</Text>
+          </View>
+        )}
+
+        {/* ZONES */}
+        {viewMode === 'zones' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>📍 Option Zones</Text>
+
+            <Text style={styles.zoneHeader}>🟢 Support Zones</Text>
+            {data.zones?.support?.length ? (
+              data.zones.support.map((z: any, i: number) => (
+                <View key={`sup-${i}`} style={styles.zoneRow}>
+                  <Text style={styles.zoneStrike}>Strike {z.strike}</Text>
+                  <Text style={styles.zoneMeta}>
+                    PUT OI: {z.put_oi.toLocaleString()} (
+                    {z.put_oi_change >= 0 ? '+' : ''}
+                    {z.put_oi_change.toLocaleString()})
+                  </Text>
+                  <Text style={styles.zoneMeta}>
+                    CALL OI: {z.call_oi.toLocaleString()} (
+                    {z.call_oi_change >= 0 ? '+' : ''}
+                    {z.call_oi_change.toLocaleString()})
+                  </Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.muted}>No support zones available</Text>
+            )}
+
+            <Text style={styles.zoneHeader}>🔴 Resistance Zones</Text>
+            {data.zones?.resistance?.length ? (
+              data.zones.resistance.map((z: any, i: number) => (
+                <View key={`res-${i}`} style={styles.zoneRow}>
+                  <Text style={styles.zoneStrike}>Strike {z.strike}</Text>
+                  <Text style={styles.zoneMeta}>
+                    CALL OI: {z.call_oi.toLocaleString()} (
+                    {z.call_oi_change >= 0 ? '+' : ''}
+                    {z.call_oi_change.toLocaleString()})
+                  </Text>
+                  <Text style={styles.zoneMeta}>
+                    PUT OI: {z.put_oi.toLocaleString()} (
+                    {z.put_oi_change >= 0 ? '+' : ''}
+                    {z.put_oi_change.toLocaleString()})
+                  </Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.muted}>No resistance zones available</Text>
+            )}
+          </View>
+        )}
+
+        {/* FOOTER */}
+        <View style={styles.footer}>
+          <Text style={styles.timestamp}>{data.timestamp}</Text>
+          <Text style={styles.disclaimer}>
+            ⚠️ Educational purpose only. Not financial advice.
+          </Text>
+        </View>
+
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </View>
   );
 }
 
-/* ===================== STYLES ===================== */
-
+/* ---------------- STYLES ---------------- */
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a', padding: 16 },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loading: { color: '#94a3b8' },
-  error: { color: '#f87171', textAlign: 'center', padding: 20 },
-  title: { fontSize: 26, fontWeight: '800', color: '#22c55e' },
-  sub: { color: '#94a3b8', marginBottom: 16 },
-  section: { marginTop: 20, fontSize: 20, color: '#e5e7eb' },
-  summary: { color: '#94a3b8', marginBottom: 8 },
-  card: {
-    backgroundColor: '#020617',
+  loadingEmoji: { fontSize: 50 },
+  loadingText: { marginTop: 10, color: '#64748B' },
+  errorEmoji: { fontSize: 50 },
+  errorText: { fontSize: 18, fontWeight: '700' },
+  retryButton: {
+    marginTop: 16,
+    backgroundColor: '#6366F1',
+    padding: 12,
+    borderRadius: 10,
+  },
+  retryButtonText: { color: '#fff', fontWeight: '700' },
+  header: {
+    padding: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    backgroundColor: '#0F172A',
+  },
+  headerTitle: { fontSize: 28, fontWeight: '800', color: '#fff' },
+  headerSubtitle: { color: '#CBD5E1' },
+  proBanner: {
+    margin: 16,
+    backgroundColor: '#FEF3C7',
     padding: 14,
     borderRadius: 12,
-    marginVertical: 6,
   },
-  strike: { fontSize: 20, color: '#f8fafc' },
-  detail: { color: '#cbd5e1', marginTop: 6 },
+  proText: { textAlign: 'center', fontWeight: '800', color: '#92400E' },
+  selectorContainer: {
+    flexDirection: 'row',
+    margin: 16,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 4,
+  },
+  selectorButton: { flex: 1, padding: 10, alignItems: 'center' },
+  selectorActive: { backgroundColor: '#fff', borderRadius: 8 },
+  selectorText: { color: '#64748B' },
+  selectorTextActive: { color: '#6366F1', fontWeight: '700' },
+  viewModeToggle: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 4,
+  },
+  viewModeButton: { flex: 1, padding: 8, alignItems: 'center' },
+  viewModeActive: { backgroundColor: '#fff', borderRadius: 8 },
+  viewModeText: { fontSize: 12, color: '#64748B' },
+  viewModeTextActive: { color: '#6366F1', fontWeight: '700' },
+  card: {
+    margin: 16,
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  indexLabel: { color: '#6366F1', fontWeight: '700' },
+  spotPrice: { fontSize: 30, fontWeight: '900' },
+  liveText: { color: '#10B981', fontWeight: '700' },
+  biasCard: {
+    margin: 16,
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 2,
+    alignItems: 'center',
+  },
+  biasEmoji: { fontSize: 32 },
+  biasTitle: { fontSize: 22, fontWeight: '900' },
+  confidenceText: { color: '#64748B', fontWeight: '700' },
+  section: { margin: 16 },
+  sectionTitle: { fontSize: 18, fontWeight: '800' },
+  zoneHeader: { marginTop: 16, fontWeight: '800' },
+  zoneRow: {
+    marginTop: 10,
+    padding: 12,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+  },
+  zoneStrike: { fontWeight: '900', marginBottom: 4 },
+  zoneMeta: { fontSize: 13, color: '#334155' },
+  muted: { color: '#64748B', fontStyle: 'italic' },
+  footer: { margin: 16 },
+  timestamp: { textAlign: 'center', color: '#64748B' },
+  disclaimer: {
+    marginTop: 8,
+    textAlign: 'center',
+    backgroundColor: '#FEF3C7',
+    padding: 10,
+    borderRadius: 8,
+  },
 });
