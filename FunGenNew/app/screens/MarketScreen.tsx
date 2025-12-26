@@ -25,20 +25,68 @@ const AUTO_REFRESH_INTERVAL = 30000; // 30 seconds
 
 /* ---------------- HELPERS ---------------- */
 
-const getStrength = (pct: number) => {
-  if (pct >= 40) return { arrow: '▲▲', label: 'STRONG', color: '#DC2626', bg: '#FEE2E2' };
-  if (pct >= 20) return { arrow: '▲', label: 'BUILDING', color: '#EF4444', bg: '#FEE2E2' };
-  if (pct <= -30) return { arrow: '▼▼', label: 'UNWINDING', color: '#64748B', bg: '#F1F5F9' };
-  if (pct < 0) return { arrow: '▼', label: 'WEAK', color: '#94A3B8', bg: '#F1F5F9' };
-  return { arrow: '→', label: 'NEUTRAL', color: '#6B7280', bg: '#F3F4F6' };
+const getActionColors = (action: string) => {
+  switch (action) {
+    case 'SHORT':
+      return {
+        gradient: ['#DC2626', '#991B1B', '#7F1D1D'],
+        accent: '#DC2626',
+        bg: '#FEE2E2',
+        text: '#7F1D1D',
+      };
+    case 'LONG':
+      return {
+        gradient: ['#059669', '#047857', '#065F46'],
+        accent: '#059669',
+        bg: '#D1FAE5',
+        text: '#065F46',
+      };
+    default:
+      return {
+        gradient: ['#6B7280', '#4B5563', '#374151'],
+        accent: '#6B7280',
+        bg: '#F3F4F6',
+        text: '#374151',
+      };
+  }
+};
+
+const getStrengthIndicator = (pct: number) => {
+  const abs = Math.abs(pct);
+  if (abs >= 60) return { bars: 5, color: '#DC2626', label: 'EXTREME' };
+  if (abs >= 40) return { bars: 4, color: '#EF4444', label: 'STRONG' };
+  if (abs >= 20) return { bars: 3, color: '#F59E0B', label: 'MODERATE' };
+  if (abs >= 10) return { bars: 2, color: '#10B981', label: 'BUILDING' };
+  return { bars: 1, color: '#94A3B8', label: 'WEAK' };
 };
 
 const formatTime = (date: Date) => {
-  return date.toLocaleTimeString('en-US', { 
-    hour: '2-digit', 
+  return date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit'
+    second: '2-digit',
   });
+};
+
+const StrengthBars = ({ strength }: { strength: number }) => {
+  const indicator = getStrengthIndicator(strength);
+  return (
+    <View style={styles.strengthBars}>
+      {[1, 2, 3, 4, 5].map((bar) => (
+        <View
+          key={bar}
+          style={[
+            styles.strengthBar,
+            {
+              backgroundColor:
+                bar <= indicator.bars ? indicator.color : '#E5E7EB',
+              height: 4 + bar * 2,
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
 };
 
 const PulseIndicator = ({ color }: { color: string }) => {
@@ -48,13 +96,13 @@ const PulseIndicator = ({ color }: { color: string }) => {
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
-          toValue: 1.3,
-          duration: 1000,
+          toValue: 1.2,
+          duration: 800,
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
           toValue: 1,
-          duration: 1000,
+          duration: 800,
           useNativeDriver: true,
         }),
       ])
@@ -65,8 +113,8 @@ const PulseIndicator = ({ color }: { color: string }) => {
     <Animated.View
       style={[
         styles.pulseOuter,
-        { 
-          backgroundColor: color + '30',
+        {
+          backgroundColor: color + '20',
           transform: [{ scale: pulseAnim }],
         },
       ]}
@@ -84,23 +132,18 @@ export default function MarketScreen() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const [countdown, setCountdown] = useState(AUTO_REFRESH_INTERVAL / 1000);
-  
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     fetchMarketData();
-    
-    // Cleanup on unmount
+
     return () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-      }
-      if (countdownIntervalRef.current) {
-        clearInterval(countdownIntervalRef.current);
-      }
+      if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
+      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
     };
   }, []);
 
@@ -110,10 +153,8 @@ export default function MarketScreen() {
     } else {
       stopAutoRefresh();
     }
-    
-    return () => {
-      stopAutoRefresh();
-    };
+
+    return () => stopAutoRefresh();
   }, [autoRefreshEnabled]);
 
   useEffect(() => {
@@ -121,13 +162,13 @@ export default function MarketScreen() {
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 800,
+          duration: 600,
           useNativeDriver: true,
         }),
         Animated.spring(slideAnim, {
           toValue: 0,
-          tension: 20,
-          friction: 7,
+          tension: 25,
+          friction: 8,
           useNativeDriver: true,
         }),
       ]).start();
@@ -135,23 +176,15 @@ export default function MarketScreen() {
   }, [marketData]);
 
   const startAutoRefresh = () => {
-    // Clear any existing intervals
     stopAutoRefresh();
-    
-    // Start auto-refresh interval
+
     refreshIntervalRef.current = setInterval(() => {
-      fetchMarketData(true); // Silent refresh
+      fetchMarketData(true);
     }, AUTO_REFRESH_INTERVAL);
-    
-    // Start countdown interval
+
     setCountdown(AUTO_REFRESH_INTERVAL / 1000);
     countdownIntervalRef.current = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          return AUTO_REFRESH_INTERVAL / 1000;
-        }
-        return prev - 1;
-      });
+      setCountdown((prev) => (prev <= 1 ? AUTO_REFRESH_INTERVAL / 1000 : prev - 1));
     }, 1000);
   };
 
@@ -168,26 +201,19 @@ export default function MarketScreen() {
 
   const fetchMarketData = async (silent = false) => {
     try {
-      if (!silent) {
-        setLoading(true);
-      }
+      if (!silent) setLoading(true);
       setError(null);
-      
+
       const response = await fetch(MARKET_URLS.NIFTY, {
-        headers: {
-          'Cache-Control': 'no-cache',
-        },
+        headers: { 'Cache-Control': 'no-cache' },
       });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
+
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
       const data = await response.json();
       setMarketData(data);
       setLastUpdated(new Date());
-      
-      // Reset countdown
+
       if (autoRefreshEnabled) {
         setCountdown(AUTO_REFRESH_INTERVAL / 1000);
       }
@@ -195,9 +221,7 @@ export default function MarketScreen() {
       console.error('Error fetching market data:', err);
       setError('Failed to load market data');
     } finally {
-      if (!silent) {
-        setLoading(false);
-      }
+      if (!silent) setLoading(false);
     }
   };
 
@@ -214,8 +238,8 @@ export default function MarketScreen() {
   if (loading && !marketData) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#10B981" />
-        <Text style={styles.loadingText}>Loading market data...</Text>
+        <ActivityIndicator size="large" color="#DC2626" />
+        <Text style={styles.loadingText}>Loading market analysis...</Text>
       </View>
     );
   }
@@ -225,11 +249,9 @@ export default function MarketScreen() {
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.centerContainer}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <Text style={styles.errorEmoji}>📡</Text>
+        <Text style={styles.errorEmoji}>⚠️</Text>
         <Text style={styles.errorText}>{error}</Text>
         <Text style={styles.errorHint}>Pull down to retry</Text>
       </ScrollView>
@@ -245,29 +267,14 @@ export default function MarketScreen() {
   }
 
   const d = marketData;
-
-  /* ---------------- MARKET STATUS ---------------- */
-
-  const isBullish = d.final_decision.bias === 'BULLISH';
-  const isBearish = d.final_decision.bias === 'BEARISH';
-
-  const statusColors = isBullish
-    ? ['#10B981', '#059669', '#047857']
-    : isBearish
-    ? ['#EF4444', '#DC2626', '#B91C1C']
-    : ['#6B7280', '#4B5563', '#374151'];
-
-  const accentColor = isBullish ? '#10B981' : isBearish ? '#EF4444' : '#6B7280';
-
-  /* ---------------- UI ---------------- */
+  const colors = getActionColors(d.final_decision.action);
+  const netBias = d.parallel_oi_analysis.cross_strike_analysis.net_bias;
 
   return (
-    <ScrollView 
-      style={styles.container} 
+    <ScrollView
+      style={styles.container}
       showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
       <Animated.View
         style={{
@@ -279,42 +286,43 @@ export default function MarketScreen() {
         <View style={styles.disclaimer}>
           <Text style={styles.disclaimerIcon}>⚠️</Text>
           <Text style={styles.disclaimerText}>
-            <Text style={styles.disclaimerBold}>Educational Purpose Only:</Text> This data is for learning and informational purposes only. We do not provide any trading or investment advice. Please consult a certified financial advisor before making any investment decisions.
+            <Text style={styles.disclaimerBold}>Educational Only:</Text> Not financial advice.
+            Consult a certified advisor before trading.
           </Text>
         </View>
 
-        {/* 🔄 AUTO REFRESH STATUS BAR */}
+        {/* 🔄 STATUS BAR */}
         <View style={styles.statusBar}>
           <View style={styles.statusLeft}>
-            <View style={[styles.statusDot, { 
-              backgroundColor: autoRefreshEnabled ? '#10B981' : '#94A3B8' 
-            }]} />
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: autoRefreshEnabled ? '#10B981' : '#94A3B8' },
+              ]}
+            />
             <Text style={styles.statusText}>
-              {lastUpdated ? `Updated ${formatTime(lastUpdated)}` : 'Fetching...'}
+              {lastUpdated ? `${formatTime(lastUpdated)}` : 'Loading...'}
             </Text>
           </View>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={styles.refreshButton}
             onPress={toggleAutoRefresh}
             activeOpacity={0.7}
           >
-            <Text style={[styles.refreshButtonText, {
-              color: autoRefreshEnabled ? '#10B981' : '#94A3B8'
-            }]}>
+            <Text
+              style={[
+                styles.refreshButtonText,
+                { color: autoRefreshEnabled ? '#10B981' : '#94A3B8' },
+              ]}
+            >
               {autoRefreshEnabled ? `🔄 ${countdown}s` : '⏸ Paused'}
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* 🔥 MARKET STATUS HERO */}
-        <LinearGradient 
-          colors={statusColors} 
-          style={styles.hero}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          {/* Decorative background circles */}
+        {/* 🎯 TRADING DECISION HERO */}
+        <LinearGradient colors={colors.gradient} style={styles.decisionHero}>
           <View style={styles.heroDecor}>
             <View style={[styles.decorCircle, styles.decorCircle1]} />
             <View style={[styles.decorCircle, styles.decorCircle2]} />
@@ -323,184 +331,245 @@ export default function MarketScreen() {
           <View style={styles.heroContent}>
             <View style={styles.heroTop}>
               <PulseIndicator color="#fff" />
-              <Text style={styles.heroEmoji}>{d.final_decision.bias_symbol}</Text>
+              <Text style={styles.heroAction}>{d.final_decision.action}</Text>
             </View>
-            
-            <Text style={styles.heroTitle}>
-              {d.final_decision.bias} PRESSURE
+
+            <Text style={styles.heroStrategy}>{d.final_decision.strategy}</Text>
+
+            <View style={styles.heroBadges}>
+              <View style={styles.heroBadge}>
+                <Text style={styles.heroBadgeLabel}>CONFIDENCE</Text>
+                <Text style={styles.heroBadgeValue}>{d.final_decision.confidence}</Text>
+              </View>
+              <View style={styles.heroBadge}>
+                <Text style={styles.heroBadgeLabel}>BIAS</Text>
+                <Text style={styles.heroBadgeValue}>{d.final_decision.bias}</Text>
+              </View>
+            </View>
+
+            <View style={styles.heroReason}>
+              <Text style={styles.heroReasonText}>{d.final_decision.reason}</Text>
+            </View>
+          </View>
+        </LinearGradient>
+
+        {/* 📊 TRADE SETUP */}
+        <View style={styles.card}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionIcon}>📊</Text>
+            <Text style={styles.sectionTitle}>Trade Setup</Text>
+            <View style={[styles.setupBadge, { backgroundColor: colors.bg }]}>
+              <Text style={[styles.setupBadgeText, { color: colors.text }]}>
+                {d.trade_setup.strategy_type.replace(/_/g, ' ')}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.tradeSetupGrid}>
+            {/* Entry Zone */}
+            <View style={styles.tradeSetupItem}>
+              <Text style={styles.tradeLabel}>ENTRY ZONE</Text>
+              <View style={styles.tradeRangeContainer}>
+                <View style={[styles.tradeRange, { borderColor: colors.accent }]}>
+                  <Text style={styles.tradeRangeValue}>
+                    {d.trade_setup.entry_range.lower}
+                  </Text>
+                  <Text style={styles.tradeRangeSeparator}>→</Text>
+                  <Text style={styles.tradeRangeValue}>
+                    {d.trade_setup.entry_range.upper}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Stop Loss */}
+            {d.trade_setup.stop_loss_levels.upside && (
+              <View style={styles.tradeSetupItem}>
+                <Text style={styles.tradeLabel}>STOP LOSS</Text>
+                <View style={styles.tradeValueBox}>
+                  <Text style={[styles.tradeValue, { color: '#DC2626' }]}>
+                    {d.trade_setup.stop_loss_levels.upside}
+                  </Text>
+                  <Text style={styles.tradeSubtext}>Upside Risk</Text>
+                </View>
+              </View>
+            )}
+
+            {/* Current Spot */}
+            <View style={styles.tradeSetupItem}>
+              <Text style={styles.tradeLabel}>SPOT PRICE</Text>
+              <View style={styles.tradeValueBox}>
+                <Text style={styles.tradeValue}>₹ {d.spot_price}</Text>
+                <Text style={styles.tradeSubtext}>Current</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.riskRewardNote}>
+            <Text style={styles.riskRewardText}>
+              💡 {d.trade_setup.risk_reward_interpretation}
             </Text>
-            
-            <View style={styles.heroBadge}>
-              <Text style={styles.heroBadgeText}>
+          </View>
+        </View>
+
+        {/* 🔥 MARKET PRESSURE */}
+        <View style={styles.card}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionIcon}>🔥</Text>
+            <Text style={styles.sectionTitle}>Market Pressure Analysis</Text>
+          </View>
+
+          <View style={styles.pressureContainer}>
+            {/* Net Bias Display */}
+            <View style={[styles.netBiasCard, { backgroundColor: colors.bg }]}>
+              <Text style={styles.netBiasLabel}>NET OI BIAS</Text>
+              <Text style={[styles.netBiasValue, { color: colors.text }]}>
+                {netBias > 0 ? '+' : ''}
+                {netBias.toLocaleString()}
+              </Text>
+              <Text style={styles.netBiasInterpretation}>
                 {d.parallel_oi_analysis.cross_strike_analysis.bias_interpretation}
               </Text>
             </View>
-            
-            <View style={styles.heroFooter}>
-              <View style={styles.confidenceMeter}>
-                <View style={styles.confidenceLabel}>
-                  <Text style={styles.confidenceLabelText}>CONFIDENCE</Text>
+
+            {/* PCR Indicators */}
+            <View style={styles.pcrGrid}>
+              <View style={styles.pcrCard}>
+                <Text style={styles.pcrLabel}>PCR OI</Text>
+                <Text style={styles.pcrValue}>{d.key_indicators.pcr_oi}</Text>
+                <Text style={styles.pcrInterpretation}>
+                  {d.key_indicators.pcr_interpretation}
+                </Text>
+              </View>
+
+              <View style={styles.pcrCard}>
+                <Text style={styles.pcrLabel}>ATM PCR</Text>
+                <Text style={styles.pcrValue}>{d.key_indicators.atm_pcr}</Text>
+                <Text style={styles.pcrInterpretation}>
+                  {d.key_indicators.atm_pcr_interpretation}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* 🎯 RESISTANCE LEVELS */}
+        <View style={styles.card}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionIcon}>🔴</Text>
+            <Text style={styles.sectionTitle}>Resistance Levels</Text>
+          </View>
+
+          <Text style={styles.zoneSummary}>
+            {d.parallel_oi_analysis.resistance_zone.summary}
+          </Text>
+
+          {d.zones.resistance.map((zone: any, idx: number) => (
+            <View key={idx} style={styles.strikeRow}>
+              <View style={styles.strikeLeft}>
+                <Text style={styles.strikePrice}>{zone.strike}</Text>
+                <Text style={styles.strikeType}>CE</Text>
+              </View>
+
+              <View style={styles.strikeCenter}>
+                <View style={styles.oiChangeRow}>
+                  <Text style={styles.oiChangeLabel}>Call OI</Text>
+                  <Text
+                    style={[
+                      styles.oiChangeValue,
+                      { color: zone.call_oi_change_pct > 0 ? '#DC2626' : '#10B981' },
+                    ]}
+                  >
+                    {zone.call_oi_change_pct > 0 ? '+' : ''}
+                    {zone.call_oi_change_pct.toFixed(1)}%
+                  </Text>
                 </View>
-                <Text style={styles.confidenceValue}>{d.final_decision.confidence}</Text>
+                <StrengthBars strength={zone.call_oi_change_pct} />
+              </View>
+
+              <View style={[styles.strikeCode, { backgroundColor: '#FEE2E2' }]}>
+                <Text style={[styles.strikeCodeText, { color: '#7F1D1D' }]}>
+                  {zone.interpretation_code.replace(/_/g, ' ')}
+                </Text>
               </View>
             </View>
-          </View>
-        </LinearGradient>
-
-        {/* 📊 PRICE CONTEXT */}
-        <View style={[styles.card, styles.priceCard]}>
-          <View style={styles.priceHeader}>
-            <View>
-              <Text style={styles.priceLabel}>SPOT PRICE</Text>
-              <Text style={styles.price}>₹ {d.spot_price}</Text>
-            </View>
-            <View style={[styles.priceBadge, { borderColor: accentColor }]}>
-              <Text style={[styles.priceBadgeText, { color: accentColor }]}>LIVE</Text>
-            </View>
-          </View>
-          
-          <View style={styles.pcrRow}>
-            <View style={styles.pcrItem}>
-              <Text style={styles.pcrLabel}>PCR</Text>
-              <Text style={styles.pcrValue}>{d.key_indicators.pcr_oi}</Text>
-              <Text style={styles.pcrInterpretation}>{d.key_indicators.pcr_interpretation}</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.pcrItem}>
-              <Text style={styles.pcrLabel}>ATM PCR</Text>
-              <Text style={styles.pcrValue}>{d.key_indicators.atm_pcr}</Text>
-              <Text style={styles.pcrInterpretation}>{d.key_indicators.atm_pcr_interpretation}</Text>
-            </View>
-          </View>
+          ))}
         </View>
 
-        {/* ⚡ OI ACTIVITY RADAR */}
+        {/* 🎯 SUPPORT LEVELS */}
         <View style={styles.card}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionIcon}>⚡</Text>
-            <Text style={styles.sectionTitle}>OI Activity Radar</Text>
+            <Text style={styles.sectionIcon}>🟢</Text>
+            <Text style={styles.sectionTitle}>Support Levels</Text>
           </View>
 
-          <View style={styles.radarContainer}>
-            {/* Resistance Strikes */}
-            <View style={styles.radarSection}>
-              <Text style={styles.radarSectionTitle}>RESISTANCE</Text>
-              {d.zones.resistance.map((z: any, i: number) => {
-                const s = getStrength(z.call_oi_change_pct);
-                return (
-                  <View key={`res-${i}`} style={styles.radarItem}>
-                    <View style={styles.radarLeft}>
-                      <View style={[styles.radarDot, { backgroundColor: '#DC2626' }]} />
-                      <Text style={styles.radarStrike}>{z.strike}</Text>
-                      <Text style={styles.radarType}>CE</Text>
-                    </View>
-                    <View style={[styles.radarBadge, { backgroundColor: s.bg }]}>
-                      <Text style={[styles.radarArrow, { color: s.color }]}>{s.arrow}</Text>
-                      <Text style={[styles.radarLabel, { color: s.color }]}>{s.label}</Text>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
+          <Text style={styles.zoneSummary}>
+            {d.parallel_oi_analysis.support_zone.summary}
+          </Text>
 
-            {/* Support Strikes */}
-            <View style={[styles.radarSection, styles.radarSectionLast]}>
-              <Text style={styles.radarSectionTitle}>SUPPORT</Text>
-              {d.zones.support.map((z: any, i: number) => {
-                const s = getStrength(z.put_oi_change_pct);
-                return (
-                  <View key={`sup-${i}`} style={styles.radarItem}>
-                    <View style={styles.radarLeft}>
-                      <View style={[styles.radarDot, { backgroundColor: '#16A34A' }]} />
-                      <Text style={styles.radarStrike}>{z.strike}</Text>
-                      <Text style={styles.radarType}>PE</Text>
-                    </View>
-                    <View style={[styles.radarBadge, { backgroundColor: s.bg }]}>
-                      <Text style={[styles.radarArrow, { color: s.color }]}>{s.arrow}</Text>
-                      <Text style={[styles.radarLabel, { color: s.color }]}>{s.label}</Text>
-                    </View>
-                  </View>
-                );
-              })}
+          {d.zones.support.map((zone: any, idx: number) => (
+            <View key={idx} style={styles.strikeRow}>
+              <View style={styles.strikeLeft}>
+                <Text style={styles.strikePrice}>{zone.strike}</Text>
+                <Text style={styles.strikeType}>PE</Text>
+              </View>
+
+              <View style={styles.strikeCenter}>
+                <View style={styles.oiChangeRow}>
+                  <Text style={styles.oiChangeLabel}>Put OI</Text>
+                  <Text
+                    style={[
+                      styles.oiChangeValue,
+                      { color: zone.put_oi_change_pct > 0 ? '#10B981' : '#DC2626' },
+                    ]}
+                  >
+                    {zone.put_oi_change_pct > 0 ? '+' : ''}
+                    {zone.put_oi_change_pct.toFixed(1)}%
+                  </Text>
+                </View>
+                <StrengthBars strength={Math.abs(zone.put_oi_change_pct)} />
+              </View>
+
+              <View style={[styles.strikeCode, { backgroundColor: '#D1FAE5' }]}>
+                <Text style={[styles.strikeCodeText, { color: '#065F46' }]}>
+                  {zone.interpretation_code.replace(/_/g, ' ')}
+                </Text>
+              </View>
             </View>
-          </View>
+          ))}
         </View>
 
-        {/* 🎯 KEY LEVELS */}
-        <View style={styles.card}>
+        {/* 📈 OI ACTIVITY SUMMARY */}
+        <LinearGradient colors={['#F8FAFC', '#F1F5F9']} style={styles.card}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionIcon}>🎯</Text>
-            <Text style={styles.sectionTitle}>Key Levels</Text>
+            <Text style={styles.sectionIcon}>📈</Text>
+            <Text style={styles.sectionTitle}>OI Activity Summary</Text>
           </View>
 
-          <View style={styles.levelsContainer}>
-            {/* Resistance */}
-            <View style={styles.levelSection}>
-              <View style={styles.levelHeader}>
-                <View style={styles.levelDot} />
-                <Text style={styles.levelTitle}>RESISTANCE</Text>
-              </View>
-              <View style={styles.levelChips}>
-                {d.zones.resistance.slice(0, 3).map((z: any, i: number) => (
-                  <LinearGradient
-                    key={i}
-                    colors={['#FEE2E2', '#FECACA']}
-                    style={styles.levelChip}
-                  >
-                    <Text style={styles.levelChipStrike}>{z.strike}</Text>
-                    <Text style={styles.levelChipCode}>{z.interpretation_code}</Text>
-                  </LinearGradient>
-                ))}
-              </View>
-            </View>
-
-            {/* Support */}
-            <View style={[styles.levelSection, { marginTop: 16 }]}>
-              <View style={styles.levelHeader}>
-                <View style={[styles.levelDot, { backgroundColor: '#10B981' }]} />
-                <Text style={styles.levelTitle}>SUPPORT</Text>
-              </View>
-              <View style={styles.levelChips}>
-                {d.zones.support.slice(0, 3).map((z: any, i: number) => (
-                  <LinearGradient
-                    key={i}
-                    colors={['#D1FAE5', '#A7F3D0']}
-                    style={styles.levelChip}
-                  >
-                    <Text style={styles.levelChipStrike}>{z.strike}</Text>
-                    <Text style={styles.levelChipCode}>{z.interpretation_code}</Text>
-                  </LinearGradient>
-                ))}
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* 🧠 MARKET SUMMARY */}
-        <LinearGradient
-          colors={['#F8FAFC', '#F1F5F9']}
-          style={[styles.card, styles.summaryCard]}
-        >
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionIcon}>🧠</Text>
-            <Text style={styles.sectionTitle}>Market Summary</Text>
-          </View>
-          
-          <View style={styles.summaryContent}>
-            <View style={styles.summaryBlock}>
-              <View style={styles.summaryIndicator} />
-              <Text style={styles.summaryText}>
-                {d.parallel_oi_analysis.resistance_zone.summary}
+          <View style={styles.oiSummaryGrid}>
+            <View style={styles.oiSummaryItem}>
+              <Text style={styles.oiSummaryLabel}>Total Call Change</Text>
+              <Text style={[styles.oiSummaryValue, { color: '#DC2626' }]}>
+                +{d.parallel_oi_analysis.cross_strike_analysis.total_call_oi_change.toLocaleString()}
               </Text>
             </View>
-            <View style={[styles.summaryBlock, { marginTop: 12 }]}>
-              <View style={styles.summaryIndicator} />
-              <Text style={styles.summaryText}>
-                {d.parallel_oi_analysis.support_zone.summary}
+
+            <View style={styles.oiSummaryItem}>
+              <Text style={styles.oiSummaryLabel}>Total Put Change</Text>
+              <Text style={[styles.oiSummaryValue, { color: '#10B981' }]}>
+                {d.parallel_oi_analysis.cross_strike_analysis.total_put_oi_change.toLocaleString()}
               </Text>
             </View>
           </View>
         </LinearGradient>
+
+        {/* 🕐 METADATA */}
+        <View style={styles.metadata}>
+          <Text style={styles.metadataText}>
+            Analysis: {new Date(d.metadata.analysis_timestamp).toLocaleString()} • Market:{' '}
+            {d.metadata.market} • Quality: {d.metadata.data_quality}
+          </Text>
+        </View>
 
         <View style={{ height: 40 }} />
       </Animated.View>
@@ -525,9 +594,10 @@ const styles = StyleSheet.create({
 
   loadingText: {
     marginTop: 12,
-    fontSize: 14,
+    fontSize: 15,
     color: '#64748B',
-    fontWeight: '600',
+    fontWeight: '700',
+    fontFamily: 'System',
   },
 
   errorEmoji: {
@@ -553,26 +623,25 @@ const styles = StyleSheet.create({
   disclaimer: {
     backgroundColor: '#FEF3C7',
     marginHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 4,
-    padding: 14,
-    borderRadius: 16,
+    marginTop: 12,
+    marginBottom: 8,
+    padding: 12,
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: '#FDE047',
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
+    gap: 8,
   },
 
   disclaimerIcon: {
-    fontSize: 18,
-    marginTop: 2,
+    fontSize: 16,
   },
 
   disclaimerText: {
     flex: 1,
     fontSize: 11,
-    lineHeight: 16,
+    lineHeight: 15,
     color: '#92400E',
     fontWeight: '600',
   },
@@ -588,17 +657,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     backgroundColor: '#fff',
     marginHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 8,
-    borderRadius: 16,
-    elevation: 2,
+    marginBottom: 12,
+    borderRadius: 12,
+    elevation: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowRadius: 2,
   },
 
   statusLeft: {
@@ -616,27 +684,29 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     color: '#64748B',
-    fontWeight: '600',
+    fontWeight: '700',
+    fontFamily: 'Menlo',
   },
 
   refreshButton: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     backgroundColor: '#F8FAFC',
-    borderRadius: 12,
+    borderRadius: 8,
   },
 
   refreshButtonText: {
     fontSize: 12,
     fontWeight: '800',
+    fontFamily: 'Menlo',
   },
 
-  /* HERO SECTION */
-  hero: {
-    margin: 16,
-    marginTop: 0,
-    padding: 28,
-    borderRadius: 28,
+  /* DECISION HERO */
+  decisionHero: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 24,
+    borderRadius: 20,
     overflow: 'hidden',
     elevation: 8,
     shadowColor: '#000',
@@ -644,6 +714,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 12,
   },
+
   heroDecor: {
     position: 'absolute',
     top: 0,
@@ -651,329 +722,444 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
+
   decorCircle: {
     position: 'absolute',
     borderRadius: 1000,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
+
   decorCircle1: {
-    width: 200,
-    height: 200,
-    top: -100,
-    right: -50,
+    width: 180,
+    height: 180,
+    top: -90,
+    right: -40,
   },
+
   decorCircle2: {
-    width: 150,
-    height: 150,
-    bottom: -75,
+    width: 140,
+    height: 140,
+    bottom: -70,
     left: -30,
   },
+
   heroContent: {
     position: 'relative',
   },
+
   heroTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
+    marginBottom: 8,
   },
-  heroEmoji: { 
-    fontSize: 48,
-  },
-  heroTitle: {
-    fontSize: 32,
+
+  heroAction: {
+    fontSize: 44,
     fontWeight: '900',
     color: '#fff',
-    marginTop: 12,
+    letterSpacing: 2,
+    fontFamily: 'System',
+    textTransform: 'uppercase',
+  },
+
+  heroStrategy: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.95)',
     textAlign: 'center',
+    marginBottom: 16,
     letterSpacing: 1,
   },
+
+  heroBadges: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+
   heroBadge: {
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(255,255,255,0.2)',
     paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 20,
-    marginTop: 12,
-    alignSelf: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  heroBadgeText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  heroFooter: {
-    marginTop: 20,
-    alignItems: 'center',
-  },
-  confidenceMeter: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center',
   },
-  confidenceLabel: {
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  confidenceLabelText: {
-    color: '#fff',
-    fontSize: 10,
+
+  heroBadgeLabel: {
+    fontSize: 9,
     fontWeight: '800',
-    letterSpacing: 0.5,
+    color: 'rgba(255,255,255,0.8)',
+    letterSpacing: 1,
+    marginBottom: 2,
   },
-  confidenceValue: {
-    color: '#fff',
-    fontSize: 16,
+
+  heroBadgeValue: {
+    fontSize: 14,
     fontWeight: '900',
+    color: '#fff',
+  },
+
+  heroReason: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+
+  heroReasonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
+    textAlign: 'center',
+    lineHeight: 18,
   },
 
   /* PULSE INDICATOR */
   pulseOuter: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
+
   pulseInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
 
-  /* CARD STYLES */
+  /* CARD */
   card: {
     backgroundColor: '#fff',
     marginHorizontal: 16,
     marginBottom: 16,
-    padding: 20,
-    borderRadius: 24,
-    elevation: 4,
+    padding: 18,
+    borderRadius: 16,
+    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
   },
 
-  /* SECTION HEADERS */
+  /* SECTION HEADER */
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
   },
+
   sectionIcon: {
-    fontSize: 24,
+    fontSize: 22,
     marginRight: 8,
   },
+
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '900',
-    color: '#1E293B',
+    color: '#0F172A',
+    flex: 1,
   },
 
-  /* PRICE CARD */
-  priceCard: {
-    backgroundColor: '#fff',
+  setupBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
-  priceHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 20,
+
+  setupBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
-  priceLabel: {
+
+  /* TRADE SETUP */
+  tradeSetupGrid: {
+    gap: 16,
+  },
+
+  tradeSetupItem: {
+    gap: 8,
+  },
+
+  tradeLabel: {
     fontSize: 11,
     fontWeight: '800',
     color: '#64748B',
     letterSpacing: 1,
-    marginBottom: 4,
   },
-  price: {
-    fontSize: 36,
+
+  tradeRangeContainer: {
+    alignItems: 'flex-start',
+  },
+
+  tradeRange: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#F8FAFC',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+  },
+
+  tradeRangeValue: {
+    fontSize: 20,
     fontWeight: '900',
     color: '#0F172A',
+    fontFamily: 'Menlo',
   },
-  priceBadge: {
-    borderWidth: 2,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+
+  tradeRangeSeparator: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#94A3B8',
   },
-  priceBadgeText: {
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  pcrRow: {
-    flexDirection: 'row',
+
+  tradeValueBox: {
     backgroundColor: '#F8FAFC',
-    borderRadius: 16,
-    padding: 16,
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'flex-start',
   },
-  pcrItem: {
-    flex: 1,
-    alignItems: 'center',
+
+  tradeValue: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#0F172A',
+    fontFamily: 'Menlo',
+    marginBottom: 2,
   },
-  pcrLabel: {
+
+  tradeSubtext: {
     fontSize: 11,
     fontWeight: '700',
     color: '#64748B',
+  },
+
+  riskRewardNote: {
+    marginTop: 16,
+    backgroundColor: '#F8FAFC',
+    padding: 12,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#3B82F6',
+  },
+
+  riskRewardText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+    lineHeight: 18,
+  },
+
+  /* PRESSURE CONTAINER */
+  pressureContainer: {
+    gap: 16,
+  },
+
+  netBiasCard: {
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+
+  netBiasLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+    color: '#64748B',
     marginBottom: 4,
   },
+
+  netBiasValue: {
+    fontSize: 32,
+    fontWeight: '900',
+    fontFamily: 'Menlo',
+    marginBottom: 4,
+  },
+
+  netBiasInterpretation: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+    textAlign: 'center',
+  },
+
+  pcrGrid: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+
+  pcrCard: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+
+  pcrLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#64748B',
+    marginBottom: 4,
+  },
+
   pcrValue: {
     fontSize: 24,
     fontWeight: '900',
     color: '#0F172A',
-    marginBottom: 2,
-  },
-  pcrInterpretation: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  divider: {
-    width: 1,
-    backgroundColor: '#E2E8F0',
-    marginHorizontal: 16,
+    fontFamily: 'Menlo',
+    marginBottom: 4,
   },
 
-  /* RADAR SECTION */
-  radarContainer: {
-    gap: 16,
-  },
-  radarSection: {
-    borderTopWidth: 2,
-    borderTopColor: '#F1F5F9',
-    paddingTop: 12,
-  },
-  radarSectionLast: {
-    marginTop: 8,
-  },
-  radarSectionTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#64748B',
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  radarItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  radarLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  radarDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  radarStrike: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: '#0F172A',
-  },
-  radarType: {
-    fontSize: 12,
+  pcrInterpretation: {
+    fontSize: 10,
     fontWeight: '700',
     color: '#64748B',
-  },
-  radarBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    gap: 6,
-  },
-  radarArrow: {
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  radarLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    textAlign: 'center',
   },
 
-  /* LEVELS SECTION */
-  levelsContainer: {},
-  levelSection: {},
-  levelHeader: {
+  /* ZONE SUMMARY */
+  zoneSummary: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+    lineHeight: 19,
+    marginBottom: 16,
+    backgroundColor: '#F8FAFC',
+    padding: 12,
+    borderRadius: 10,
+  },
+
+  /* STRIKE ROW */
+  strikeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
+    paddingVertical: 12,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
-  levelDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#EF4444',
+
+  strikeLeft: {
+    width: 80,
   },
-  levelTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#64748B',
-    letterSpacing: 0.5,
-  },
-  levelChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  levelChip: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 16,
-    minWidth: 100,
-  },
-  levelChipStrike: {
+
+  strikePrice: {
     fontSize: 18,
     fontWeight: '900',
     color: '#0F172A',
+    fontFamily: 'Menlo',
   },
-  levelChipCode: {
+
+  strikeType: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#64748B',
+  },
+
+  strikeCenter: {
+    flex: 1,
+    gap: 6,
+  },
+
+  oiChangeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  oiChangeLabel: {
     fontSize: 11,
     fontWeight: '700',
     color: '#64748B',
-    marginTop: 2,
   },
 
-  /* SUMMARY CARD */
-  summaryCard: {
-    borderWidth: 2,
-    borderColor: '#E2E8F0',
+  oiChangeValue: {
+    fontSize: 14,
+    fontWeight: '900',
+    fontFamily: 'Menlo',
   },
-  summaryContent: {},
-  summaryBlock: {
+
+  strengthBars: {
+    flexDirection: 'row',
+    gap: 3,
+    alignItems: 'flex-end',
+  },
+
+  strengthBar: {
+    width: 6,
+    borderRadius: 2,
+  },
+
+  strikeCode: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+
+  strikeCodeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+
+  /* OI SUMMARY */
+  oiSummaryGrid: {
     flexDirection: 'row',
     gap: 12,
   },
-  summaryIndicator: {
-    width: 4,
-    backgroundColor: '#3B82F6',
-    borderRadius: 2,
-    marginTop: 2,
-  },
-  summaryText: {
+
+  oiSummaryItem: {
     flex: 1,
-    fontSize: 14,
-    lineHeight: 22,
-    color: '#475569',
-    fontWeight: '600',
+    backgroundColor: '#fff',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+
+  oiSummaryLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#64748B',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+
+  oiSummaryValue: {
+    fontSize: 18,
+    fontWeight: '900',
+    fontFamily: 'Menlo',
+  },
+
+  /* METADATA */
+  metadata: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    padding: 12,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+
+  metadataText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
+    textAlign: 'center',
+    fontFamily: 'Menlo',
   },
 });
