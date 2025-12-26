@@ -11,9 +11,9 @@ android {
 
     defaultConfig {
         applicationId "com.fungen.app"
-        minSdk 23
-        targetSdk 34
-        versionCode 7
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 8
         versionName "1.0.8"
     }
 
