@@ -138,6 +138,13 @@ export default function MarketScreen() {
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  const [selectedIndex, setSelectedIndex] =
+    useState<'NIFTY' | 'BANKNIFTY'>('NIFTY');
+
+  const [viewMode, setViewMode] =
+    useState<'overview' | 'zones'>('overview');
+
+  /* ---------------- FETCH DATA ---------------- */
   useEffect(() => {
     fetchMarketData();
 

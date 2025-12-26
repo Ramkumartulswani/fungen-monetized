@@ -1,10 +1,9 @@
 buildscript {
     ext {
-        buildToolsVersion = "35.0.0"
-        minSdkVersion = 21
-        compileSdkVersion = 35
-        targetSdkVersion = 35
-        ndkVersion = "25.1.8937393"
+        buildToolsVersion = "34.0.0"
+        minSdkVersion = 23
+        compileSdkVersion = 34
+        targetSdkVersion = 34
         kotlinVersion = "1.9.22"
     }
     repositories {
@@ -12,8 +11,27 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("com.android.tools.build:gradle:8.3.2")
-        classpath("com.facebook.react:react-native-gradle-plugin")
+        classpath("com.android.tools.build:gradle:8.1.1")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
+        classpath("com.google.gms:google-services:4.4.0")
     }
 }
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url("$rootDir/../node_modules/react-native/android") }
+    }
+}
+
+subprojects { subproject ->
+    subproject.plugins.withId("com.android.library") {
+        subproject.extensions.configure(com.android.build.gradle.LibraryExtension) { ext ->
+            ext.buildFeatures {
+                buildConfig true
+            }
+        }
+    }
+}
+

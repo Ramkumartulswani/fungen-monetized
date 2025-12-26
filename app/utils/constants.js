@@ -1,1 +1,0 @@
-export const STORAGE_KEYS={LAST_GEN:'fungen_last_generated'}; export const ADMOB_APP_ID='<YOUR_ADMOB_APP_ID>'; export const ADMOB_BANNER_ID='<YOUR_ADMOB_BANNER_ID>';
