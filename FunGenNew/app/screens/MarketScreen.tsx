@@ -204,8 +204,8 @@ export default function MarketScreen() {
       if (!silent) setLoading(true);
       setError(null);
 
-      const response = await fetch(MARKET_URLS.NIFTY, {
-        headers: { 'Cache-Control': 'no-cache' },
+      const response = await fetch(MARKET_URLS.NIFTY + '&t=' + Date.now(), {
+        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
       });
 
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
