@@ -9,7 +9,7 @@ import {
   Animated,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { useStats } from '../context/StatsContext';
 
 const { width } = Dimensions.get('window');
@@ -38,13 +38,7 @@ const AnimatedNumber = ({ value }: { value: number }) => {
 
 export default function HomeScreen() {
   const navigation = useNavigation();
-  const { stats, syncStats } = useStats();
-
-  useFocusEffect(
-    useCallback(() => {
-      syncStats();
-    }, [syncStats])
-  );
+  const { stats } = useStats(); // 🔗 LIVE SYNCED STATS
 
   const quickStats = [
     {
