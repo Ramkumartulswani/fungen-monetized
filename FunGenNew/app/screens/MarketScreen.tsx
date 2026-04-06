@@ -282,16 +282,16 @@ export default function MarketScreen() {
           transform: [{ translateY: slideAnim }],
         }}
       >
-        {/* ΓÜá∩╕Å DISCLAIMER */}
+        {/* ⚠️ DISCLAIMER */}
         <View style={styles.disclaimer}>
-          <Text style={styles.disclaimerIcon}>ΓÜá∩╕Å</Text>
+          <Text style={styles.disclaimerIcon}>⚠️</Text>
           <Text style={styles.disclaimerText}>
             <Text style={styles.disclaimerBold}>Educational Only:</Text> Not financial advice.
             Consult a certified advisor before trading.
           </Text>
         </View>
 
-        {/* ≡ƒöä STATUS BAR */}
+        {/* 🔄 STATUS BAR */}
         <View style={styles.statusBar}>
           <View style={styles.statusLeft}>
             <View
