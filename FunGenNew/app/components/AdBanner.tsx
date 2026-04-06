@@ -1,51 +1,36 @@
 import React, { useState, useRef } from 'react';
-import { View, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Dimensions, ActivityIndicator, Modal, TouchableOpacity, Text, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
-const AD_UNIT_ID = 'ca-app-pub-5140463358652561/5622690496';
-const TEST_AD_URL = 'https://googleads.g.doubleclick.net/mads/static/mad_sdk.html';
+const AD_IDS = {
+  banner: Platform.OS === 'android' ? 'ca-app-pub-5140463358652561/4048273795' : 'ca-app-pub-5140463358652561/4048273795',
+  interstitial: 'ca-app-pub-5140463358652561/4757337345',
+  rewarded: 'ca-app-pub-5140463358652561/8321177830',
+};
 
-interface AdBannerProps {
-  isTestMode?: boolean;
-}
-
-export const AdBanner: React.FC<AdBannerProps> = ({ isTestMode = false }) => {
+export const AdBanner: React.FC = () => {
   const [loading, setLoading] = useState(true);
-  const webViewRef = useRef<WebView>(null);
 
   const adHtml = `
     <!DOCTYPE html>
     <html>
     <head>
-      <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
       <style>
         * { margin: 0; padding: 0; }
-        html, body { height: 100%; background: transparent; }
-        .ad-container {
-          width: 100%;
-          height: 100%;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          background: #f5f5f5;
-        }
-        .ad-container iframe {
-          width: 100%;
-          height: 100%;
-          border: none;
-        }
+        body { background: #f5f5f5; }
       </style>
     </head>
     <body>
-      <div class="ad-container">
-        <iframe 
-          src="https://googleads.g.doubleclick.net/mads/admobe/sdk_inslider/v1?slotId=/30497360/ca-app-pub-5140463358652561/5622690496&___ad_format=image&__ad_slot_type=DEPRECATED_MRAID_SIMPLE_AD&__caa_sample_key=a&__caa_key=dsp&__direct_vast_return_flag=0&__key=pubid&__mraid_expand=0&__network_code=30497360&__template_type=html&__tracking_supported=1&__unique_request_id=1&__wtv=1&__zone=/30497360/ca-app-pub-5140463358652561/5622690496&dsp=${encodeURIComponent('ca-app-pub-5140463358652561/5622690496')}"
-          scrolling="no"
-          frameborder="0">
-        </iframe>
-      </div>
+      <iframe 
+        src="https://googleads.g.doubleclick.net/mads/admobe/sdk_inslider/v1?slotId=${AD_IDS.banner}"
+        width="100%"
+        height="50"
+        scrolling="no"
+        frameborder="0">
+      </iframe>
     </body>
     </html>
   `;
@@ -58,29 +43,63 @@ export const AdBanner: React.FC<AdBannerProps> = ({ isTestMode = false }) => {
         </View>
       )}
       <WebView
-        ref={webViewRef}
         style={styles.webview}
         originWhitelist={['*']}
         source={{ html: adHtml }}
         onLoadStart={() => setLoading(true)}
         onLoadEnd={() => setLoading(false)}
         javaScriptEnabled={true}
-        domStorageEnabled={true}
-        allowFileAccess={true}
-        setSupportMultipleWindows={false}
         showsVerticalScrollIndicator={false}
-        showsHorizontalScrollIndicator={false}
       />
     </View>
   );
 };
 
-export default AdBanner;
+export const showInterstitialAd = (onClose?: () => void) => {
+  const interstitialHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <style>
+        * { margin: 0; padding: 0; }
+        body { background: #000; }
+        iframe { width: 100%; height: 100%; border: none; }
+      </style>
+    </head>
+    <body>
+      <iframe 
+        src="https://googleads.g.doubleclick.net/mads/admobe/sdk_inslider/v1?slotId=${AD_IDS.interstitial}"
+        width="100%"
+        height="100%"
+        scrolling="no"
+        frameborder="0">
+      </iframe>
+    </body>
+    </html>
+  `;
+
+  return (
+    <Modal visible={true} transparent animationType="fade">
+      <View style={styles.modalContainer}>
+        <WebView
+          style={styles.interstitialWebview}
+          originWhitelist={['*']}
+          source={{ html: interstitialHtml }}
+          javaScriptEnabled={true}
+        />
+        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <Text style={styles.closeText}>X</Text>
+        </TouchableOpacity>
+      </View>
+    </Modal>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
     width: width,
-    height: 60,
+    height: 50,
     backgroundColor: '#f5f5f5',
   },
   webview: {
@@ -95,6 +114,30 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  interstitialWebview: {
+    width: width * 0.9,
+    height: height * 0.7,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    width: 40,
+    height: 40,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeText: {
+    fontSize: 20,
+    fontWeight: 'bold',
   },
 });
