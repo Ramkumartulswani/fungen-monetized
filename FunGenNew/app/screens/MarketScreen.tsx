@@ -251,7 +251,7 @@ export default function MarketScreen() {
         contentContainerStyle={styles.centerContainer}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <Text style={styles.errorEmoji}>ΓÜá∩╕Å</Text>
+        <Text style={styles.errorEmoji}>⚠️</Text>
         <Text style={styles.errorText}>{error}</Text>
         <Text style={styles.errorHint}>Pull down to retry</Text>
       </ScrollView>
@@ -267,7 +267,8 @@ export default function MarketScreen() {
   }
 
   const d = marketData;
-  const colors = getActionColors(d.final_decision.action);
+  const direction = d.market_outlook?.direction || d.final_decision?.bias || 'NEUTRAL';
+  const colors = getActionColors(direction);
   const netBias = d.parallel_oi_analysis.cross_strike_analysis.net_bias;
 
   return (
@@ -316,7 +317,7 @@ export default function MarketScreen() {
                 { color: autoRefreshEnabled ? '#10B981' : '#94A3B8' },
               ]}
             >
-              {autoRefreshEnabled ? `≡ƒöä ${countdown}s` : 'ΓÅ╕ Paused'}
+              {autoRefreshEnabled ? `🔄 ${countdown}s` : '⏸ Paused'}
             </Text>
           </TouchableOpacity>
         </View>
