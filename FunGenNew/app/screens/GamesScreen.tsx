@@ -81,18 +81,13 @@ export default function GamesScreen() {
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const aimIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const memoryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const timeoutRef = useRef<any>(null);
+  const aimIntervalRef = useRef<any>(null);
 
   useEffect(() => {
     loadGameData();
     animateEntry();
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      if (aimIntervalRef.current) clearInterval(aimIntervalRef.current);
-      if (memoryTimeoutRef.current) clearTimeout(memoryTimeoutRef.current);
-    };
   }, []);
 
   useEffect(() => {
@@ -358,7 +353,7 @@ export default function GamesScreen() {
           }, 500);
         }
       } else {
-        memoryTimeoutRef.current = setTimeout(() => {
+        setTimeout(() => {
           newCards[first].flipped = false;
           newCards[second].flipped = false;
           setMemoryCards(newCards);
