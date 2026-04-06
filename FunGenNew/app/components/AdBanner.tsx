@@ -1,16 +1,18 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React from 'react';
+import { View, StyleSheet } from 'react-native';
 import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 
-const TEST_BANNER_ID = 'ca-app-pub-3940256099942544/6300978111';
-const PROD_BANNER_ID = 'ca-app-pub-3940256099942544/6300978111';
+const APP_ID = 'ca-app-pub-5140463358652561~3341696785';
+const BANNER_AD_UNIT_ID = __DEV__ 
+  ? 'ca-app-pub-3940256099942544/6300978111' 
+  : 'ca-app-pub-5140463358652561/5622690496';
 
 interface AdBannerProps {
   isTestMode?: boolean;
 }
 
-export const AdBanner: React.FC<AdBannerProps> = ({ isTestMode = true }) => {
-  const bannerId = isTestMode ? TEST_BANNER_ID : PROD_BANNER_ID;
+export const AdBanner: React.FC<AdBannerProps> = ({ isTestMode = __DEV__ }) => {
+  const bannerId = isTestMode ? TestIds.BANNER : BANNER_AD_UNIT_ID;
 
   return (
     <View style={styles.container}>
