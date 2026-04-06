@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Stats = {
   gamesPlayed: number;
@@ -12,9 +13,16 @@ type StatsContextType = {
   incrementGame: () => void;
   incrementJoke: () => void;
   incrementFact: () => void;
+  syncStats: () => void;
 };
 
 const StatsContext = createContext<StatsContextType | null>(null);
+
+const STATS_KEYS = {
+  gamesPlayed: 'GAME_STATS',
+  jokesRead: 'JOKES_VIEWED',
+  factsLearned: 'FACTS_READ',
+};
 
 export const StatsProvider = ({ children }: { children: ReactNode }) => {
   const [stats, setStats] = useState<Stats>({
@@ -23,6 +31,31 @@ export const StatsProvider = ({ children }: { children: ReactNode }) => {
     factsLearned: 0,
     achievements: 0,
   });
+
+  const syncStats = useCallback(async () => {
+    try {
+      const [gameStats, jokesViewed, factsRead] = await Promise.all([
+        AsyncStorage.getItem(STATS_KEYS.gamesPlayed),
+        AsyncStorage.getItem(STATS_KEYS.jokesRead),
+        AsyncStorage.getItem(STATS_KEYS.factsLearned),
+      ]);
+
+      const parsedGameStats = gameStats ? JSON.parse(gameStats) : { gamesPlayed: 0 };
+
+      setStats({
+        gamesPlayed: parsedGameStats.gamesPlayed || 0,
+        jokesRead: jokesViewed ? parseInt(jokesViewed, 10) : 0,
+        factsLearned: factsRead ? parseInt(factsRead, 10) : 0,
+        achievements: 0,
+      });
+    } catch (e) {
+      console.error('Failed to sync stats:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    syncStats();
+  }, [syncStats]);
 
   const incrementGame = () =>
     setStats(prev => ({ ...prev, gamesPlayed: prev.gamesPlayed + 1 }));
@@ -35,7 +68,7 @@ export const StatsProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <StatsContext.Provider
-      value={{ stats, incrementGame, incrementJoke, incrementFact }}
+      value={{ stats, incrementGame, incrementJoke, incrementFact, syncStats }}
     >
       {children}
     </StatsContext.Provider>
