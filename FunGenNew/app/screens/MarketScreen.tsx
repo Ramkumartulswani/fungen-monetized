@@ -356,7 +356,7 @@ export default function MarketScreen() {
         {/* ≡ƒôè TRADE SETUP */}
         <View style={styles.card}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionIcon}>≡ƒôè</Text>
+            <Text style={styles.sectionIcon}>📊</Text>
             <Text style={styles.sectionTitle}>Trade Setup</Text>
             <View style={[styles.setupBadge, { backgroundColor: colors.bg }]}>
               <Text style={[styles.setupBadgeText, { color: colors.text }]}>
@@ -415,7 +415,7 @@ export default function MarketScreen() {
         {/* ≡ƒöÑ MARKET PRESSURE */}
         <View style={styles.card}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionIcon}>≡ƒöÑ</Text>
+            <Text style={styles.sectionIcon}>🔥</Text>
             <Text style={styles.sectionTitle}>Market Pressure Analysis</Text>
           </View>
 
@@ -456,7 +456,7 @@ export default function MarketScreen() {
         {/* ≡ƒÄ» RESISTANCE LEVELS */}
         <View style={styles.card}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionIcon}>≡ƒö┤</Text>
+            <Text style={styles.sectionIcon}>🔴</Text>
             <Text style={styles.sectionTitle}>Resistance Levels</Text>
           </View>
 
@@ -499,7 +499,7 @@ export default function MarketScreen() {
         {/* ≡ƒÄ» SUPPORT LEVELS */}
         <View style={styles.card}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionIcon}>≡ƒƒó</Text>
+            <Text style={styles.sectionIcon}>🟢</Text>
             <Text style={styles.sectionTitle}>Support Levels</Text>
           </View>
 
@@ -542,7 +542,7 @@ export default function MarketScreen() {
         {/* ≡ƒôê OI ACTIVITY SUMMARY */}
         <LinearGradient colors={['#F8FAFC', '#F1F5F9']} style={styles.card}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionIcon}>≡ƒôê</Text>
+            <Text style={styles.sectionIcon}>📈</Text>
             <Text style={styles.sectionTitle}>OI Activity Summary</Text>
           </View>
 
