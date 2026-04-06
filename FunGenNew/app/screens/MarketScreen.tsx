@@ -407,7 +407,7 @@ export default function MarketScreen() {
 
           <View style={styles.riskRewardNote}>
             <Text style={styles.riskRewardText}>
-              ≡ƒÆí {d.trade_setup.risk_reward_interpretation}
+              💡 {d.trade_setup.risk_reward_interpretation}
             </Text>
           </View>
         </View>
@@ -566,8 +566,8 @@ export default function MarketScreen() {
         {/* ≡ƒòÉ METADATA */}
         <View style={styles.metadata}>
           <Text style={styles.metadataText}>
-            Analysis: {new Date(d.metadata.analysis_timestamp).toLocaleString()} ΓÇó Market:{' '}
-            {d.metadata.market} ΓÇó Quality: {d.metadata.data_quality}
+            Analysis: {new Date(d.metadata.analysis_timestamp).toLocaleString()} • Market:{' '}
+            {d.metadata.market} • Quality: {d.metadata.data_quality}
           </Text>
         </View>
 
