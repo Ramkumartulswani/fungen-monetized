@@ -9,16 +9,14 @@ import {
   TouchableOpacity,
   Platform,
 } from 'react-native';
+import { IndexType, MarketData, ViewModeType } from '../types/market';
+import { isValidMarketData } from '../utils/marketValidation';
 import { useNavigation } from '@react-navigation/native';
-
-// Feature flags
 import { getFeatureFlags } from '../utils/featureFlags';
 
-const MARKET_URLS: any = {
-  NIFTY:
-    'https://drive.google.com/uc?export=download&id=1t9fYO6ry9igdt3DZqlBqakMArBA4CdUK',
-  BANKNIFTY:
-    'https://drive.google.com/uc?export=download&id=1Yj0AtywQaR-RW0ofrOpw7p8Yi1S66WVa',
+const MARKET_URLS: Record<IndexType, string> = {
+  NIFTY: 'https://drive.google.com/uc?export=download&id=1t9fYO6ry9igdt3DZqlBqakMArBA4CdUK',
+  BANKNIFTY: 'https://drive.google.com/uc?export=download&id=1Yj0AtywQaR-RW0ofrOpw7p8Yi1S66WVa',
 };
 
 export default function MarketScreen() {
@@ -27,16 +25,14 @@ export default function MarketScreen() {
   /* ---------------- STATE ---------------- */
   const [showProBanner, setShowProBanner] = useState(true);
 
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<MarketData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
 
-  const [selectedIndex, setSelectedIndex] =
-    useState<'NIFTY' | 'BANKNIFTY'>('NIFTY');
+  const [selectedIndex, setSelectedIndex] = useState<IndexType>('NIFTY');
 
-  const [viewMode, setViewMode] =
-    useState<'overview' | 'zones'>('overview');
+  const [viewMode, setViewMode] = useState<ViewModeType>('overview');
 
   /* ---------------- FETCH DATA ---------------- */
   useEffect(() => {
@@ -65,6 +61,13 @@ export default function MarketScreen() {
       const url = MARKET_URLS[selectedIndex] + '&t=' + Date.now();
       const res = await fetch(url);
       const json = await res.json();
+      
+      if (!isValidMarketData(json)) {
+        console.error('Invalid market data received:', json);
+        setError(true);
+        return;
+      }
+      
       setData(json);
     } catch (e) {
       console.error(e);
@@ -227,7 +230,7 @@ export default function MarketScreen() {
 
             <Text style={styles.zoneHeader}>🟢 Support Zones</Text>
             {data.zones?.support?.length ? (
-              data.zones.support.map((z: any, i: number) => (
+              data.zones.support.map((z, i) => (
                 <View key={`sup-${i}`} style={styles.zoneRow}>
                   <Text style={styles.zoneStrike}>Strike {z.strike}</Text>
                   <Text style={styles.zoneMeta}>
@@ -248,7 +251,7 @@ export default function MarketScreen() {
 
             <Text style={styles.zoneHeader}>🔴 Resistance Zones</Text>
             {data.zones?.resistance?.length ? (
-              data.zones.resistance.map((z: any, i: number) => (
+              data.zones.resistance.map((z, i) => (
                 <View key={`res-${i}`} style={styles.zoneRow}>
                   <Text style={styles.zoneStrike}>Strike {z.strike}</Text>
                   <Text style={styles.zoneMeta}>
