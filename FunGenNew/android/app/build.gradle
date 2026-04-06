@@ -52,9 +52,9 @@ android {
 }
 
 dependencies {
-    // Firebase disabled for now
-     implementation platform("com.google.firebase:firebase-bom:32.7.0")
-     implementation "com.google.firebase:firebase-config"
+    // Firebase disabled
+    // implementation platform("com.google.firebase:firebase-bom:32.7.0")
+    // implementation "com.google.firebase:firebase-config"
 
     implementation("com.facebook.react:react-android")
     implementation("com.facebook.react:hermes-android")
@@ -65,5 +65,5 @@ dependencies {
 
 apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle")
 applyNativeModulesAppBuildGradle(project)
-apply plugin: "com.google.gms.google-services"
+// apply plugin: "com.google.gms.google-services"
 
